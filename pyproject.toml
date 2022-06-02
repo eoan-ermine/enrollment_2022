@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "backend_school_task"
+name = "enrollment_2022"
 version = "0.1.0"
 description = ""
 authors = ["Sidoruk Danil Vadimovich <danilsidoruknv@yandex.ru>"]
 
-packages =[
-    { include = "app" }
+packages = [
+    { include = "analyzer" }
 ]
 
 [tool.poetry.dependencies]
@@ -13,6 +13,7 @@ python = "^3.8"
 fastapi = "^0.78.0"
 uvicorn = "^0.17.6"
 SQLAlchemy = "^1.4.37"
+alembic = "^1.8.0"
 
 [tool.poetry.dev-dependencies]
 fastapi-code-generator = "^0.3.5"
@@ -22,4 +23,5 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-start = "app.main:start"
+start = "analyzer.api.app:start"
+analyzer-db = "analyzer.db.__main__:main"
