@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -8,7 +7,11 @@ from uuid import UUID
 import uvicorn
 from fastapi import FastAPI, Query
 
-from .models import Error, ShopUnit, ShopUnitImportRequest, ShopUnitStatisticResponse
+from .models import Base
+from .schemas import Error, ShopUnit, ShopUnitImportRequest, ShopUnitStatisticResponse
+from .database import SessionLocal, engine
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     description='Вступительное задание в Летнюю Школу Бэкенд Разработки Яндекса 2022',

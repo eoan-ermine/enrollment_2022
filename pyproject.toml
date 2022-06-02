@@ -12,6 +12,7 @@ packages =[
 python = "^3.8"
 fastapi = "^0.78.0"
 uvicorn = "^0.17.6"
+SQLAlchemy = "^1.4.37"
 
 [tool.poetry.dev-dependencies]
 fastapi-code-generator = "^0.3.5"
