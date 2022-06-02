@@ -14,6 +14,7 @@ fastapi = "^0.78.0"
 uvicorn = "^0.17.6"
 
 [tool.poetry.dev-dependencies]
+fastapi-code-generator = "^0.3.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
