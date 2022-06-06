@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 from analyzer.db.core import Base
-from analyzer.db.schema import Item, Category
+from analyzer.db.schema import ShopUnit, PriceUpdate
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
