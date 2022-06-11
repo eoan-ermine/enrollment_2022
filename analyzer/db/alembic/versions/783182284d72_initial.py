@@ -1,15 +1,15 @@
 """Initial
 
-Revision ID: b3f71a359844
+Revision ID: 783182284d72
 Revises: 
-Create Date: 2022-06-11 14:44:53.873771
+Create Date: 2022-06-11 15:23:50.875562
 
 """
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "b3f71a359844"
+revision = "783182284d72"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,11 +21,11 @@ def upgrade() -> None:
         "shop_units",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("parent", sa.Integer(), nullable=True),
+        sa.Column("parent_id", sa.Integer(), nullable=True),
         sa.Column("price", sa.Integer(), nullable=True),
         sa.Column("is_category", sa.Boolean(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["parent"], ["shop_units.id"], name=op.f("fk__shop_units__parent__shop_units"), ondelete="CASCADE"
+            ["parent_id"], ["shop_units.id"], name=op.f("fk__shop_units__parent_id__shop_units"), ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk__shop_units")),
     )

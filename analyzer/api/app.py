@@ -39,7 +39,8 @@ def validation_exception_handler(request: Request, exc: RequestValidationError):
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
 def delete_delete_id(id: UUID) -> Union[None, Error]:
-    pass
+    with SessionLocal.begin() as session:
+        session.query(schema.ShopUnit).filter(schema.ShopUnit.id == str(id)).delete(synchronize_session=False)
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
@@ -47,10 +48,11 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
     with SessionLocal.begin() as session:
         for unit in body.items:
+            parent = unit.parentId
             unit = schema.ShopUnit(
                 id=str(unit.id),
                 name=unit.name,
-                parent=str(unit.parentId),
+                parent_id=str(parent) if parent else parent,
                 price=unit.price,
                 is_category=unit.type == ShopUnitType.CATEGORY,
             )
