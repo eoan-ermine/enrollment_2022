@@ -18,6 +18,6 @@ class PriceUpdate(Base):
     __tablename__ = "price_updates"
 
     id = Column(Integer, primary_key=True, index=True)
-    unit_id = Column(Integer, ForeignKey("price_updates.id", ondelete="CASCADE"))
+    unit_id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"))
     price = Column(Integer)
     date = Column(DateTime)
