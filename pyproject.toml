@@ -24,4 +24,5 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 start = "analyzer.api.app:start"
+test = "tests.unit_test:main"
 analyzer-db = "analyzer.db.__main__:main"
