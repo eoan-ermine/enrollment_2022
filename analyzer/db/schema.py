@@ -1,7 +1,5 @@
-from sqlalchemy import MetaData, Column, ForeignKey
-from sqlalchemy.types import Boolean, Integer, String, DateTime
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy import Column, ForeignKey
+from sqlalchemy.types import Boolean, DateTime, Integer, String
 
 from .core import Base
 
