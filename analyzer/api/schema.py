@@ -60,10 +60,10 @@ class ShopUnitImport(BaseModel):
 
 
 class ShopUnitImportRequest(BaseModel):
-    items: Optional[List[ShopUnitImport]] = Field(
+    items: List[ShopUnitImport] = Field(
         None, description='Импортируемые элементы'
     )
-    updateDate: Optional[datetime] = Field(
+    updateDate: datetime = Field(
         None,
         description='Время обновления добавляемых товаров/категорий.',
         example='2022-05-28T21:12:01.516Z',
