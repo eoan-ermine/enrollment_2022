@@ -48,17 +48,19 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
     with SessionLocal.begin() as session:
         for unit in body.items:
-            parent = unit.parentId
+            unit_id = str(unit.id)
+            parent = str(unit.parentId) if unit.parentId else None
+
             unit = schema.ShopUnit(
-                id=str(unit.id),
+                id=unit_id,
                 name=unit.name,
-                parent_id=str(parent) if parent else parent,
+                parent_id=parent,
                 price=unit.price,
                 is_category=unit.type == ShopUnitType.CATEGORY,
             )
             session.merge(unit)
 
-            price_update = schema.PriceUpdate(unit_id=str(unit.id), price=unit.price, date=updateDate)
+            price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
             session.add(price_update)
 
 
