@@ -17,6 +17,8 @@ class ShopUnit(Base):
     price = Column(Integer)
     is_category = Column(Boolean)
 
+    last_update = Column(DateTime)
+
 
 class PriceUpdate(Base):
     __tablename__ = "price_updates"

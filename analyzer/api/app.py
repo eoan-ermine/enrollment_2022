@@ -57,6 +57,7 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
                 parent_id=parent,
                 price=unit.price,
                 is_category=unit.type == ShopUnitType.CATEGORY,
+                last_update=updateDate,
             )
             session.merge(unit)
 
@@ -83,7 +84,22 @@ def get_node_id_statistic(
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
 def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
-    pass
+    ident = str(id)
+    item = None
+
+    with SessionLocal() as session:
+        item = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).first()
+        if item.is_category:
+            item.price = category_price(ident)
+
+    return ShopUnit(
+        id=UUID(item.id),
+        name=item.name,
+        parentId=UUID(item.parentId) if item.parentId else None,
+        type=ShopUnitType.CATEGORY if item.is_category else ShopUnitType.OFFER,
+        price=item.price,
+        date=item.date,
+    )
 
 
 @app.get(
