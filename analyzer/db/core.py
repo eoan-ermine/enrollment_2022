@@ -8,6 +8,8 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 
 
 def _fk_pragma_on_connect(dbapi_con, con_record):
+    dbapi_con.execute("pragma synchronous=OFF")
+    dbapi_con.execute("pragma journal_mode=WAL")
     dbapi_con.execute("pragma foreign_keys=ON")
 
 
