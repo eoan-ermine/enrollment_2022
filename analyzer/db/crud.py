@@ -1,9 +1,17 @@
+from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
-from analyzer.db.schema import ShopUnit, UnitHierarchy
+from analyzer.db.schema import PriceUpdate, ShopUnit, UnitHierarchy
+
+
+class IntervalType(Enum):
+    OPENED = 0
+    CLOSED = 1
 
 
 class ShopUnitCRUD:
@@ -57,3 +65,14 @@ class ShopUnitCRUD:
 
         for category in categories:
             ShopUnitCRUD.update_category(session, category, units_ids[category])
+
+
+class PriceUpdateCRUD:
+    @staticmethod
+    def get_updates(
+        session: Session, date_start: datetime, date_end: datetime, interval_type: IntervalType = IntervalType.OPENED
+    ):
+        condition = and_(PriceUpdate.date > date_start, PriceUpdate.date < date_end)
+        if interval_type == IntervalType.CLOSED:
+            condition = and_(PriceUpdate.date >= date_start, PriceUpdate.date <= date_end)
+        return session.query(PriceUpdate).filter(condition).all()

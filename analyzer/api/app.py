@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Union
 from uuid import UUID
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal
-from analyzer.db.crud import ShopUnitCRUD
+from analyzer.db.crud import IntervalType, PriceUpdateCRUD, ShopUnitCRUD
 
 from .schema import (
     Error,
@@ -83,8 +83,9 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
             )
             session.merge(unit)
 
-            price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
-            session.add(price_update)
+            if not unit.is_category:
+                price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
+                session.add(price_update)
 
     if contains_unit_with_parent:
         with SessionLocal.begin() as session:
@@ -124,7 +125,20 @@ def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
     responses={"400": {"model": Error}},
 )
 def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
-    pass
+    with SessionLocal() as session:
+        print(date - timedelta(days=1), date)
+        updates = PriceUpdateCRUD.get_updates(session, date - timedelta(days=1), date, IntervalType.CLOSED)
+        print(updates)
+        if updates:
+            return ShopUnitStatisticResponse(
+                items=[
+                    ShopUnit.from_model(item)
+                    for item in session.query(schema.ShopUnit).filter(
+                        schema.ShopUnit.id.in_([update.unit_id for update in updates])
+                    )
+                ]
+            )
+        return ShopUnitStatisticResponse(items=[])
 
 
 def start():

@@ -48,14 +48,15 @@ class ShopUnit(BaseModel):
 
     @staticmethod
     def from_model(model: schema.ShopUnit):
+        children = getattr(model, "children", None)
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
             date=model.last_update,
             parentId=UUID(model.parent_id) if model.parent_id else None,
             type=ShopUnitType.CATEGORY if model.is_category else ShopUnitType.OFFER,
-            price=None if not model.children and model.is_category else model.price,
-            children=[ShopUnit.from_model(child) for child in model.children] if model.is_category else None,
+            price=None if not children and model.is_category else model.price,
+            children=[ShopUnit.from_model(child) for child in children] if model.is_category else None,
         )
 
 
