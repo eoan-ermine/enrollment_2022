@@ -62,11 +62,11 @@ def delete_delete_id(id: UUID) -> Union[None, Error]:
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
-def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
+async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
     contains_unit_with_parent = False
 
-    with SessionLocal.begin() as session:
+    async with SessionLocal.begin() as session:
         for unit in body.items:
             unit_id = str(unit.id)
             parent = str(unit.parentId) if unit.parentId else None
@@ -82,17 +82,16 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
                 is_category=unit.type == ShopUnitType.CATEGORY,
                 last_update=updateDate,
             )
-            session.merge(unit)
+            await session.merge(unit)
 
             if not unit.is_category:
                 price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
                 session.add(price_update)
 
     if contains_unit_with_parent:
-        with SessionLocal.begin() as session:
-            ShopUnitCRUD.update_categories(
-                session, ShopUnitCRUD.get_parents_ids(session, [str(unit.id) for unit in body.items])
-            )
+        async with SessionLocal.begin() as session:
+            parents = await ShopUnitCRUD.get_parents_ids(session, [str(unit.id) for unit in body.items])
+            await ShopUnitCRUD.update_categories(session, parents)
 
 
 @app.get(

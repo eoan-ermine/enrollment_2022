@@ -1,10 +1,12 @@
-from sqlalchemy import MetaData, create_engine, event
+from sqlalchemy import MetaData, event
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./database.db"
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./database.db"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_async_engine(SQLALCHEMY_DATABASE_URL, future=True)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession)
 
 
 def _fk_pragma_on_connect(dbapi_con, con_record):
@@ -14,9 +16,7 @@ def _fk_pragma_on_connect(dbapi_con, con_record):
     dbapi_con.execute("pragma recursive_triggers=ON")
 
 
-event.listen(engine, "connect", _fk_pragma_on_connect)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+event.listen(engine.sync_engine, "connect", _fk_pragma_on_connect)
 
 convention = {
     "all_column_names": lambda constraint, table: "_".join([column.name for column in constraint.columns.values()]),
@@ -32,5 +32,4 @@ convention = {
     "pk": "pk__%(table_name)s",
 }
 metadata = MetaData(naming_convention=convention)
-
 Base = declarative_base(metadata=metadata)

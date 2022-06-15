@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from sqlalchemy import update
+from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
@@ -28,33 +30,40 @@ class ShopUnitCRUD:
         return session.query(ShopUnit).filter(ShopUnit.id.in_([update.unit_id for update in updates])).all()
 
     @staticmethod
-    def get_parents_ids(session: Session, units_ids: List[str]) -> List[str]:
-        return [
-            unit.parent_id
-            for unit in session.query(UnitHierarchy)
-            .with_entities(UnitHierarchy.parent_id)
-            .filter(UnitHierarchy.id.in_(units_ids))
-            .distinct(UnitHierarchy.parent_id)
-            .all()
-        ]
-
-    @staticmethod
-    def update_category(session: Session, category_id: str, units_ids: List[str]):
-        update_data = (
-            session.query(func.avg(ShopUnit.price).label("price"), func.max(ShopUnit.last_update).label("last_update"))
-            .filter(ShopUnit.id.in_(units_ids))
-            .first()
+    async def get_parents_ids(session: Session, units_ids: List[str]) -> List[str]:
+        q = await session.execute(
+            select(UnitHierarchy.parent_id).where(UnitHierarchy.id.in_(units_ids)).distinct(UnitHierarchy.parent_id)
         )
 
-        session.add(PriceUpdate(unit_id=category_id, price=update_data.price, date=update_data.last_update))
-        session.query(ShopUnit).filter(ShopUnit.id == category_id).update(
-            {"price": update_data.price, "last_update": update_data.last_update}, synchronize_session=False
+        return q.scalars().all()
+
+    @staticmethod
+    async def update_category(session: Session, category_id: str, units_ids: List[str]):
+        q = await session.execute(
+            select(func.avg(ShopUnit.price), func.max(ShopUnit.last_update))
+            .select_from(ShopUnit)
+            .where(ShopUnit.id.in_(units_ids))
+        )
+        price, last_update = q.first()
+
+        session.add(PriceUpdate(unit_id=category_id, price=price, date=last_update))
+        await session.execute(
+            update(ShopUnit)
+            .where(ShopUnit.id == category_id)
+            .values(
+                price=price,
+                last_update=last_update,
+            )
+            .execution_options(synchronize_session=False)
         )
 
     @staticmethod
-    def update_categories(session: Session, categories: List[str]):
+    async def update_categories(session: Session, categories: List[str]):
         units_ids = dict()
-        hierarchy_data = session.query(UnitHierarchy).filter(UnitHierarchy.parent_id.in_(categories)).all()
+
+        q = await session.execute(select(UnitHierarchy).where(UnitHierarchy.parent_id.in_(categories)))
+        hierarchy_data = q.scalars().all()
+
         for hierarchy in hierarchy_data:
             ident, parent_ident = hierarchy.id, hierarchy.parent_id
             if parent_ident not in units_ids:
@@ -62,4 +71,4 @@ class ShopUnitCRUD:
             units_ids[parent_ident].append(ident)
 
         for category in categories:
-            ShopUnitCRUD.update_category(session, category, units_ids[category])
+            await ShopUnitCRUD.update_category(session, category, units_ids[category])
