@@ -23,8 +23,9 @@ class ShopUnitCRUD:
         return item
 
     @staticmethod
-    def get_from_updates(session: Session, updates: List[PriceUpdate]) -> List[ShopUnit]:
-        return session.query(ShopUnit).filter(ShopUnit.id.in_([update.unit_id for update in updates])).all()
+    async def get_from_updates_ids(session: Session, updates_ids: List[int]) -> List[ShopUnit]:
+        q = await session.scalars(select(ShopUnit).where(ShopUnit.id.in_(updates_ids)))
+        return q.all()
 
     @staticmethod
     async def get_parents_ids(session: Session, units_ids: List[str]) -> List[str]:

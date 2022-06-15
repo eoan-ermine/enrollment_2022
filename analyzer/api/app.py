@@ -146,21 +146,16 @@ async def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
     response_model=ShopUnitStatisticResponse,
     responses={"400": {"model": Error}},
 )
-def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
-    with SessionLocal() as session:
-        updates = (
-            session.query(schema.PriceUpdate)
-            .filter(schema.ShopUnit.is_category == False)
-            .filter(IntervalType.CLOSED(schema.PriceUpdate.date, date - timedelta(days=1), date))
-            .join(schema.ShopUnit, schema.ShopUnit.id == schema.PriceUpdate.unit_id)
-            .all()
+async def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
+    async with SessionLocal() as session:
+        q = await session.scalars(
+            select(schema.ShopUnit)
+            .select_from(schema.ShopUnit)
+            .where(schema.ShopUnit.is_category == False)
+            .where(IntervalType.CLOSED(schema.PriceUpdate.date, date - timedelta(days=1), date))
+            .join(schema.PriceUpdate, schema.ShopUnit.id == schema.PriceUpdate.unit_id)
         )
-
-        if updates:
-            return ShopUnitStatisticResponse(
-                items=[ShopUnit.from_model(item) for item in ShopUnitCRUD.get_from_updates(session, updates)]
-            )
-        return ShopUnitStatisticResponse(items=[])
+        return ShopUnitStatisticResponse(items=[ShopUnit.from_model(unit) for unit in q.all()])
 
 
 def start():
