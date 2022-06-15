@@ -11,7 +11,7 @@ class ShopUnit(Base):
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
 
-    parent_id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"))
+    parent_id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"), index=True)
     parent = relationship(lambda: ShopUnit, remote_side=id, backref=backref("shop_units", passive_deletes=True))
 
     price = Column(Integer)
@@ -25,7 +25,7 @@ class PriceUpdate(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    unit_id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"))
+    unit_id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"), index=True)
     unit = relationship("ShopUnit", backref=backref("price_updates", passive_deletes=True))
 
     price = Column(Integer)
