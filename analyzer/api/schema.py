@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from analyzer.db import schema
+
 
 class ShopUnitType(Enum):
     OFFER = "OFFER"
@@ -39,6 +41,18 @@ class ShopUnit(BaseModel):
         None,
         description="Список всех дочерних товаров\\категорий. Для товаров поле равно null.",
     )
+
+    @staticmethod
+    def from_model(model: schema.ShopUnit):
+        return ShopUnit(
+            id=UUID(model.id),
+            name=model.name,
+            date=model.last_update,
+            parentId=UUID(model.parent_id) if model.parent_id else None,
+            type=ShopUnitType.CATEGORY if model.is_category else ShopUnitType.OFFER,
+            price=None if not model.children and model.is_category else model.price,
+            children=[ShopUnit.from_model(child) for child in model.children] if model.is_category else None,
+        )
 
 
 class ShopUnitImport(BaseModel):

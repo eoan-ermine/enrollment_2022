@@ -98,18 +98,12 @@ def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
     item = None
 
     with SessionLocal() as session:
-        item = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).first()
-        if item.is_category:
-            item.price = category_price(ident)
+        item = ShopUnitCRUD.get_item(session, ident)
 
-    return ShopUnit(
-        id=UUID(item.id),
-        name=item.name,
-        parentId=UUID(item.parentId) if item.parentId else None,
-        type=ShopUnitType.CATEGORY if item.is_category else ShopUnitType.OFFER,
-        price=item.price,
-        date=item.date,
-    )
+    if item is None:
+        return JSONResponse(status_code=404, content=jsonable_encoder(Error(code=404, message="Item not found")))
+
+    return ShopUnit.from_model(item)
 
 
 @app.get(
