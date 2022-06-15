@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal
+from analyzer.db.crud import ShopUnitCRUD
 
 from .schema import (
     Error,
@@ -46,6 +47,7 @@ def delete_delete_id(id: UUID) -> Union[None, Error]:
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
+
     with SessionLocal.begin() as session:
         for unit in body.items:
             unit_id = str(unit.id)
@@ -55,7 +57,7 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
                 id=unit_id,
                 name=unit.name,
                 parent_id=parent,
-                price=unit.price,
+                price=unit.price if unit.price else 0,
                 is_category=unit.type == ShopUnitType.CATEGORY,
                 last_update=updateDate,
             )
@@ -63,6 +65,14 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
 
             price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
             session.add(price_update)
+
+    with SessionLocal.begin() as session:
+        hierarchy_data = (
+            session.query(schema.UnitHierarchy)
+            .filter(schema.UnitHierarchy.id.in_([str(unit.id) for unit in body.items]))
+            .all()
+        )
+        ShopUnitCRUD.update_prices(session, [unit.parent_id for unit in hierarchy_data])
 
 
 @app.get(
