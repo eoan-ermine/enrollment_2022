@@ -30,3 +30,10 @@ class PriceUpdate(Base):
 
     price = Column(Integer)
     date = Column(DateTime)
+
+
+class UnitHierarchy(Base):
+    __tablename__ = "units_hierarchy"
+
+    parent_id = Column(Integer, primary_key=True, index=True, nullable=False)
+    id = Column(Integer, primary_key=True, index=True, nullable=False)
