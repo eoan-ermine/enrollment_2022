@@ -47,7 +47,10 @@ def not_found_exception_handler(_: Request, _1: NoResultFound):
 )
 def delete_delete_id(id: UUID) -> Union[None, Error]:
     with SessionLocal.begin() as session:
-        session.query(schema.ShopUnit).filter(schema.ShopUnit.id == str(id)).delete(synchronize_session=False)
+        item = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == str(id)).one()
+        item.delete(synchronize_session=False)
+        if item.is_category:
+            ShopUnitCRUD.update_categories(session, [id])
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
@@ -78,7 +81,7 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
             .filter(schema.UnitHierarchy.id.in_([str(unit.id) for unit in body.items]))
             .all()
         )
-        ShopUnitCRUD.update_prices(session, [unit.parent_id for unit in hierarchy_data])
+        ShopUnitCRUD.update_categories(session, [unit.parent_id for unit in hierarchy_data])
 
 
 @app.get(

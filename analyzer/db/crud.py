@@ -36,7 +36,7 @@ class ShopUnitCRUD:
         )
 
     @staticmethod
-    def update_prices(session: Session, categories: List[str]):
+    def update_categories(session: Session, categories: List[str]):
         units_ids = dict()
         hierarchy_data = session.query(UnitHierarchy).filter(UnitHierarchy.parent_id.in_(categories)).all()
         for hierarchy in hierarchy_data:
