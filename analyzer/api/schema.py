@@ -6,8 +6,12 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic.json import ENCODERS_BY_TYPE
 
 from analyzer.db import schema
+
+# Format of datetimes in unit_tests
+ENCODERS_BY_TYPE[datetime] = lambda date_obj: date_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class ShopUnitType(Enum):
