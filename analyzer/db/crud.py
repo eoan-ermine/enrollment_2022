@@ -9,7 +9,7 @@ from analyzer.db.schema import ShopUnit, UnitHierarchy
 class ShopUnitCRUD:
     @staticmethod
     def get_item(session: Session, category: str) -> Optional[ShopUnit]:
-        item = session.query(ShopUnit).filter(ShopUnit.id == category).one_or_none()
+        item = session.query(ShopUnit).filter(ShopUnit.id == category).one()
 
         item.children = None
         if item.is_category:
