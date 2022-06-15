@@ -24,6 +24,16 @@ class ShopUnitCRUD:
         return item
 
     @staticmethod
+    def get_parents_ids(session: Session, units_ids: List[str]) -> List[str]:
+        return [
+            unit.parent_id
+            for unit in session.query(UnitHierarchy)
+            .with_entities(UnitHierarchy.parent_id)
+            .filter(UnitHierarchy.id.in_(units_ids))
+            .all()
+        ]
+
+    @staticmethod
     def update_category(session: Session, category_id: str, units_ids: List[str]):
         update_data = (
             session.query(func.avg(ShopUnit.price).label("price"), func.max(ShopUnit.last_update).label("last_update"))

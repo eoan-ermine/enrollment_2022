@@ -46,21 +46,32 @@ def not_found_exception_handler(_: Request, _1: NoResultFound):
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
 def delete_delete_id(id: UUID) -> Union[None, Error]:
+    ident = str(id)
+
     with SessionLocal.begin() as session:
-        item = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == str(id)).one()
-        item.delete(synchronize_session=False)
-        if item.is_category:
-            ShopUnitCRUD.update_categories(session, [id])
+        parents = ShopUnitCRUD.get_parents_ids(session, [ident])
+        rows_deleted = (
+            session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).delete(synchronize_session=False)
+        )
+
+        if rows_deleted == 0:
+            raise NoResultFound()
+
+        ShopUnitCRUD.update_categories(session, parents)
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
+    contains_unit_with_parent = False
 
     with SessionLocal.begin() as session:
         for unit in body.items:
             unit_id = str(unit.id)
             parent = str(unit.parentId) if unit.parentId else None
+
+            if parent:
+                contains_unit_with_parent = True
 
             unit = schema.ShopUnit(
                 id=unit_id,
@@ -75,13 +86,11 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
             price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
             session.add(price_update)
 
-    with SessionLocal.begin() as session:
-        hierarchy_data = (
-            session.query(schema.UnitHierarchy)
-            .filter(schema.UnitHierarchy.id.in_([str(unit.id) for unit in body.items]))
-            .all()
-        )
-        ShopUnitCRUD.update_categories(session, [unit.parent_id for unit in hierarchy_data])
+    if contains_unit_with_parent:
+        with SessionLocal.begin() as session:
+            ShopUnitCRUD.update_categories(
+                session, ShopUnitCRUD.get_parents_ids(session, [str(unit.id) for unit in body.items])
+            )
 
 
 @app.get(
