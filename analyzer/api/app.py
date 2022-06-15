@@ -10,6 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete
+from sqlalchemy.future import select
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
@@ -100,28 +101,30 @@ async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     response_model=ShopUnitStatisticResponse,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-def get_node_id_statistic(
+async def get_node_id_statistic(
     id: UUID,
     date_start: Optional[datetime] = Query(default=datetime.min, alias="dateStart"),
     date_end: Optional[datetime] = Query(default=datetime.max, alias="dateEnd"),
 ) -> Union[ShopUnitStatisticResponse, Error]:
     ident = str(id)
 
-    with SessionLocal() as session:
-        unit = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).one()
-        updates = (
-            session.query(schema.PriceUpdate)
-            .with_entities(schema.PriceUpdate.price, schema.PriceUpdate.date)
-            .filter(schema.PriceUpdate.unit_id == ident)
-            .filter(IntervalType.OPENED(schema.PriceUpdate.date, date_start, date_end))
-        ).all()
+    async with SessionLocal() as session:
+        q = await session.execute(select(schema.ShopUnit).where(schema.ShopUnit.id == ident))
+        unit = q.scalars().one()
+
+        q = await session.execute(
+            select(schema.PriceUpdate.price, schema.PriceUpdate.date)
+            .where(schema.PriceUpdate.unit_id == ident)
+            .where(IntervalType.OPENED(schema.PriceUpdate.date, date_start, date_end))
+        )
+        updates = q.all()
+
         return ShopUnitStatisticResponse(
             items=[
                 ShopUnit.from_model(
-                    schema.ShopUnit(**{**model_to_dict(unit), "price": update.price, "last_update": update.date}),
-                    null_price=False,
+                    schema.ShopUnit(**{**model_to_dict(unit), "price": price, "last_update": date}), null_price=False
                 )
-                for update in updates
+                for price, date in updates
             ]
         )
 
@@ -131,9 +134,9 @@ def get_node_id_statistic(
     response_model=ShopUnit,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
-    with SessionLocal() as session:
-        item = ShopUnitCRUD.get_item(session, str(id))
+async def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
+    async with SessionLocal() as session:
+        item = await ShopUnitCRUD.get_item(session, str(id))
 
     return ShopUnit.from_model(item)
 

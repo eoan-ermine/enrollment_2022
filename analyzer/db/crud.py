@@ -10,18 +10,15 @@ from analyzer.db.schema import PriceUpdate, ShopUnit, UnitHierarchy
 
 class ShopUnitCRUD:
     @staticmethod
-    def get_item(session: Session, category: str) -> Optional[ShopUnit]:
-        item = session.query(ShopUnit).filter(ShopUnit.id == category).one()
+    async def get_item(session: Session, category: str) -> Optional[ShopUnit]:
+        q = await session.scalars(select(ShopUnit).where(ShopUnit.id == category))
+        item = q.one()
 
         item.children = None
         if item.is_category:
-            item.children = [
-                ShopUnitCRUD.get_item(session, child.id)
-                for child in session.query(ShopUnit)
-                .with_entities(ShopUnit.id)
-                .filter(ShopUnit.parent_id == category)
-                .all()
-            ]
+            q = await session.scalars(select(ShopUnit.id).where(ShopUnit.parent_id == category))
+            childs_ids = q.all()
+            item.children = [await ShopUnitCRUD.get_item(session, child_id) for child_id in childs_ids]
 
         return item
 
