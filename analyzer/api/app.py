@@ -9,6 +9,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import delete
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
@@ -46,19 +47,19 @@ def not_found_exception_handler(_: Request, _1: NoResultFound):
     response_model=None,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-def delete_delete_id(id: UUID) -> Union[None, Error]:
+async def delete_delete_id(id: UUID) -> Union[None, Error]:
     ident = str(id)
 
-    with SessionLocal.begin() as session:
-        parents = ShopUnitCRUD.get_parents_ids(session, [ident])
-        rows_deleted = (
-            session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).delete(synchronize_session=False)
+    async with SessionLocal.begin() as session:
+        parents = await ShopUnitCRUD.get_parents_ids(session, [ident])
+        rows_deleted = await session.execute(
+            delete(schema.ShopUnit).where(schema.ShopUnit.id == ident).execution_options(synchronize_session=False)
         )
 
         if rows_deleted == 0:
             raise NoResultFound()
 
-        ShopUnitCRUD.update_categories(session, parents)
+        await ShopUnitCRUD.update_categories(session, parents)
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
