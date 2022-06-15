@@ -11,7 +11,7 @@ from pydantic.json import ENCODERS_BY_TYPE
 from analyzer.db import schema
 
 # Format of datetimes in unit_tests
-ENCODERS_BY_TYPE[datetime] = lambda date_obj: date_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%SZ")
 
 
 class ShopUnitType(Enum):
@@ -47,7 +47,7 @@ class ShopUnit(BaseModel):
     )
 
     @staticmethod
-    def from_model(model: schema.ShopUnit):
+    def from_model(model: schema.ShopUnit, null_price=True):
         children = getattr(model, "children", None)
         return ShopUnit(
             id=UUID(model.id),
@@ -55,8 +55,8 @@ class ShopUnit(BaseModel):
             date=model.last_update,
             parentId=UUID(model.parent_id) if model.parent_id else None,
             type=ShopUnitType.CATEGORY if model.is_category else ShopUnitType.OFFER,
-            price=None if not children and model.is_category else model.price,
-            children=[ShopUnit.from_model(child) for child in children] if model.is_category else None,
+            price=None if not children and model.is_category and null_price else model.price,
+            children=[ShopUnit.from_model(child) for child in children] if model.is_category and children else None,
         )
 
 

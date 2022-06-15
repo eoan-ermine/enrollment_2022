@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal
 from analyzer.db.crud import ShopUnitCRUD
-from analyzer.db.utils import IntervalType
+from analyzer.db.utils import IntervalType, model_to_dict
 
 from .schema import (
     Error,
@@ -102,10 +102,28 @@ def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
 )
 def get_node_id_statistic(
     id: UUID,
-    date_start: Optional[datetime] = Query(None, alias="dateStart"),
-    date_end: Optional[datetime] = Query(None, alias="dateEnd"),
+    date_start: Optional[datetime] = Query(default=datetime.min, alias="dateStart"),
+    date_end: Optional[datetime] = Query(default=datetime.max, alias="dateEnd"),
 ) -> Union[ShopUnitStatisticResponse, Error]:
-    pass
+    ident = str(id)
+
+    with SessionLocal() as session:
+        unit = session.query(schema.ShopUnit).filter(schema.ShopUnit.id == ident).one()
+        updates = (
+            session.query(schema.PriceUpdate)
+            .with_entities(schema.PriceUpdate.price, schema.PriceUpdate.date)
+            .filter(schema.PriceUpdate.unit_id == ident)
+            .filter(IntervalType.OPENED(schema.PriceUpdate.date, date_start, date_end))
+        ).all()
+        return ShopUnitStatisticResponse(
+            items=[
+                ShopUnit.from_model(
+                    schema.ShopUnit(**{**model_to_dict(unit), "price": update.price, "last_update": update.date}),
+                    null_price=False,
+                )
+                for update in updates
+            ]
+        )
 
 
 @app.get(
@@ -129,7 +147,9 @@ def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
     with SessionLocal() as session:
         updates = (
             session.query(schema.PriceUpdate)
+            .filter(schema.ShopUnit.is_category == False)
             .filter(IntervalType.CLOSED(schema.PriceUpdate.date, date - timedelta(days=1), date))
+            .join(schema.ShopUnit, schema.ShopUnit.id == schema.PriceUpdate.unit_id)
             .all()
         )
 

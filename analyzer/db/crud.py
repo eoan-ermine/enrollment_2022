@@ -34,6 +34,7 @@ class ShopUnitCRUD:
             for unit in session.query(UnitHierarchy)
             .with_entities(UnitHierarchy.parent_id)
             .filter(UnitHierarchy.id.in_(units_ids))
+            .distinct(UnitHierarchy.parent_id)
             .all()
         ]
 
@@ -45,6 +46,7 @@ class ShopUnitCRUD:
             .first()
         )
 
+        session.add(PriceUpdate(unit_id=category_id, price=update_data.price, date=update_data.last_update))
         session.query(ShopUnit).filter(ShopUnit.id == category_id).update(
             {"price": update_data.price, "last_update": update_data.last_update}, synchronize_session=False
         )
