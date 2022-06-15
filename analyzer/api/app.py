@@ -13,7 +13,8 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal
-from analyzer.db.crud import IntervalType, PriceUpdateCRUD, ShopUnitCRUD
+from analyzer.db.crud import ShopUnitCRUD
+from analyzer.db.utils import IntervalType
 
 from .schema import (
     Error,
@@ -126,17 +127,15 @@ def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
 )
 def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
     with SessionLocal() as session:
-        print(date - timedelta(days=1), date)
-        updates = PriceUpdateCRUD.get_updates(session, date - timedelta(days=1), date, IntervalType.CLOSED)
-        print(updates)
+        updates = (
+            session.query(schema.PriceUpdate)
+            .filter(IntervalType.CLOSED(schema.PriceUpdate.date, date - timedelta(days=1), date))
+            .all()
+        )
+
         if updates:
             return ShopUnitStatisticResponse(
-                items=[
-                    ShopUnit.from_model(item)
-                    for item in session.query(schema.ShopUnit).filter(
-                        schema.ShopUnit.id.in_([update.unit_id for update in updates])
-                    )
-                ]
+                items=[ShopUnit.from_model(item) for item in ShopUnitCRUD.get_from_updates(session, updates)]
             )
         return ShopUnitStatisticResponse(items=[])
 
