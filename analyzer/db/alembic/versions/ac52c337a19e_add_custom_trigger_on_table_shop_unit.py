@@ -1,7 +1,7 @@
 """Add custom trigger on table shop_unit
 
 Revision ID: ac52c337a19e
-Revises: c11b6527acbf
+Revises: 4cdc399aff5e
 Create Date: 2022-06-14 20:59:02.085557
 
 """
@@ -10,42 +10,34 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "ac52c337a19e"
-down_revision = "c11b6527acbf"
+down_revision = "4cdc399aff5e"
 branch_labels = None
 depends_on = None
 
-trigger_insert = """
-CREATE TRIGGER tr_update_price_insert
+trigger_units_path_insert = """
+CREATE TRIGGER tr_units_path_insert
 AFTER INSERT ON shop_units WHEN NEW.parent_id IS NOT NULL AND NEW.is_category = 0
 BEGIN
-    UPDATE
-        shop_units
-    SET
-        price = price + NEW.price
-    WHERE
-        id = NEW.parent_id;
+    INSERT INTO units_hierarchy(parent_id, id) VALUES (NEW.parent_id, NEW.id);
 END;
 """
 
-trigger_update = """
-CREATE TRIGGER tr_update_price_update
-AFTER UPDATE OF price ON shop_units WHEN NEW.parent_id IS NOT NULL
+trigger_hierarchy_path_insert = """
+CREATE TRIGGER tr_hierarchy_path_insert
+AFTER INSERT ON units_hierarchy WHEN (SELECT (SELECT parent_id FROM shop_units WHERE id = NEW.parent_id) IS NOT NULL)
 BEGIN
-    UPDATE
-        shop_units
-    SET
-        price = (SELECT SUM(price) FROM shop_units WHERE parent_id = NEW.parent_id)
-    WHERE
-        id = NEW.parent_id;
+    INSERT INTO units_hierarchy(parent_id, id) VALUES (
+        (SELECT parent_id FROM shop_units WHERE id = NEW.parent_id), NEW.id
+    );
 END;
 """
 
 
 def upgrade() -> None:
-    op.execute(trigger_insert)
-    op.execute(trigger_update)
+    op.execute(trigger_units_path_insert)
+    op.execute(trigger_hierarchy_path_insert)
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS tr_update_price_insert ON shop_units CASCADE;")
-    op.execute("DROP TRIGGER IF EXISTS tr_update_price_update ON shop_units CASCADE;")
+    op.execute("DROP TRIGGER IF EXISTS tr_units_path_insert ON shop_units CASCADE;")
+    op.execute("DROP TRIGGER IF EXISTS tr_hierarchy_path_insert ON units_hierarchy CASCADE;")

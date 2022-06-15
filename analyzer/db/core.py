@@ -11,6 +11,7 @@ def _fk_pragma_on_connect(dbapi_con, con_record):
     dbapi_con.execute("pragma synchronous=OFF")
     dbapi_con.execute("pragma journal_mode=WAL")
     dbapi_con.execute("pragma foreign_keys=ON")
+    dbapi_con.execute("pragma recursive_triggers=ON")
 
 
 event.listen(engine, "connect", _fk_pragma_on_connect)
