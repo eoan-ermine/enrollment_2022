@@ -39,5 +39,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS tr_units_path_insert ON shop_units CASCADE;")
-    op.execute("DROP TRIGGER IF EXISTS tr_hierarchy_path_insert ON units_hierarchy CASCADE;")
+    op.execute("DROP TRIGGER IF EXISTS tr_units_path_insert;")
+    op.execute("DROP TRIGGER IF EXISTS tr_hierarchy_path_insert;")
