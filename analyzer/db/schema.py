@@ -2,6 +2,8 @@ from sqlalchemy import Column, ForeignKey
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.types import Boolean, DateTime, Integer, String
 
+from analyzer.api.schema import ShopUnitType
+
 from .core import Base
 
 
@@ -18,6 +20,17 @@ class ShopUnit(Base):
     is_category = Column(Boolean)
 
     last_update = Column(DateTime)
+
+    @staticmethod
+    def parse(model, last_update: int):
+        return ShopUnit(
+            id=str(model.id),
+            name=model.name,
+            parent_id=str(model.parentId) if model.parentId else None,
+            price=model.price if model.price else 0,
+            is_category=model.type == ShopUnitType.CATEGORY,
+            last_update=last_update,
+        )
 
 
 class PriceUpdate(Base):

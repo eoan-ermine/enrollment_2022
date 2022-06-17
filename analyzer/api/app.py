@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
@@ -10,21 +10,18 @@ from fastapi import FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import delete
-from sqlalchemy.future import select
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal, sync_engine
-from analyzer.db.crud import ShopUnitCRUD
-from analyzer.db.utils import IntervalType, model_to_dict
+from analyzer.db.dal import DAL
 
 from .schema import (
     Error,
     ShopUnit,
     ShopUnitImportRequest,
     ShopUnitStatisticResponse,
-    ShopUnitType,
+    ShopUnitStatisticUnit,
 )
 
 app = FastAPI(
@@ -53,52 +50,37 @@ async def delete_delete_id(id: UUID) -> Union[None, Error]:
     ident = str(id)
 
     async with SessionLocal.begin() as session:
-        parents = await ShopUnitCRUD.get_parents_ids(session, [ident])
-        rows_deleted = await session.execute(
-            delete(schema.ShopUnit).where(schema.ShopUnit.id == ident).execution_options(synchronize_session=False)
-        )
+        dal = DAL(session)
 
-        if rows_deleted == 0:
-            raise NoResultFound()
-
-        await ShopUnitCRUD.update_categories(session, parents)
+        parents = await dal.get_parents_ids([ident])
+        await dal.delete_unit(ident)
+        await dal.update_categories(parents)
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
-    updateDate = body.updateDate
-
+    last_update = body.updateDate
     contains_unit_with_parent = False
     offers_ids = []
 
+    units = []
+    for item in body.items:
+        unit = schema.ShopUnit.parse(item, last_update=last_update)
+        if unit.parent_id:
+            contains_unit_with_parent = True
+        if not unit.is_category:
+            offers_ids.append(unit.id)
+        units.append(unit)
+
     async with SessionLocal.begin() as session:
-        for unit in body.items:
-            unit_id = str(unit.id)
-
-            parent = str(unit.parentId) if unit.parentId else None
-            if parent:
-                contains_unit_with_parent = True
-
-            unit = schema.ShopUnit(
-                id=unit_id,
-                name=unit.name,
-                parent_id=parent,
-                price=unit.price if unit.price else 0,
-                is_category=unit.type == ShopUnitType.CATEGORY,
-                last_update=updateDate,
-            )
-            await session.merge(unit)
-
-            if not unit.is_category:
-                offers_ids.append(unit_id)
-                price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
-                session.add(price_update)
+        await DAL(session).add_units(units, last_update)
 
     # Следующий код должен выполняться лишь после обработки триггеров на вставку ShopUnit
     if contains_unit_with_parent:
         async with SessionLocal.begin() as session:
-            parents = await ShopUnitCRUD.get_parents_ids(session, offers_ids)
-            await ShopUnitCRUD.update_categories(session, parents, updateDate)
+            dal = DAL(session)
+            parents = await dal.get_parents_ids(offers_ids)
+            await dal.update_categories(parents, last_update)
 
 
 @app.get(
@@ -111,27 +93,9 @@ async def get_node_id_statistic(
     date_start: Optional[datetime] = Query(default=datetime.min, alias="dateStart"),
     date_end: Optional[datetime] = Query(default=datetime.max, alias="dateEnd"),
 ) -> Union[ShopUnitStatisticResponse, Error]:
-    ident = str(id)
-
     async with SessionLocal() as session:
-        q = await session.execute(select(schema.ShopUnit).where(schema.ShopUnit.id == ident))
-        unit = q.scalars().one()
-
-        q = await session.execute(
-            select(schema.PriceUpdate.price, schema.PriceUpdate.date)
-            .where(schema.PriceUpdate.unit_id == ident)
-            .where(IntervalType.OPENED(schema.PriceUpdate.date, date_start, date_end))
-        )
-        updates = q.all()
-
-        return ShopUnitStatisticResponse(
-            items=[
-                ShopUnit.from_model(
-                    schema.ShopUnit(**{**model_to_dict(unit), "price": price, "last_update": date}), null_price=False
-                )
-                for price, date in updates
-            ]
-        )
+        statistic_units = await DAL(session).get_node_statistic(str(id), date_start, date_end)
+        return ShopUnitStatisticResponse(items=[ShopUnitStatisticUnit.from_model(unit) for unit in statistic_units])
 
 
 @app.get(
@@ -141,9 +105,8 @@ async def get_node_id_statistic(
 )
 async def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
     async with SessionLocal() as session:
-        item = await ShopUnitCRUD.get_item(session, str(id))
-
-    return ShopUnit.from_model(item)
+        unit = await DAL(session).get_node(str(id))
+        return ShopUnit.from_model(unit)
 
 
 @app.get(
@@ -153,14 +116,8 @@ async def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
 )
 async def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
     async with SessionLocal() as session:
-        q = await session.scalars(
-            select(schema.ShopUnit)
-            .select_from(schema.ShopUnit)
-            .where(schema.ShopUnit.is_category == False)
-            .where(IntervalType.CLOSED(schema.PriceUpdate.date, date - timedelta(days=1), date))
-            .join(schema.PriceUpdate, schema.ShopUnit.id == schema.PriceUpdate.unit_id)
-        )
-        return ShopUnitStatisticResponse(items=[ShopUnit.from_model(unit) for unit in q.all()])
+        units = await DAL(session).get_sales(date)
+        return ShopUnitStatisticResponse(items=[ShopUnitStatisticUnit.from_model(unit) for unit in units])
 
 
 def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False):
