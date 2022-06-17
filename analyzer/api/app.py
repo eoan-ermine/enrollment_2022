@@ -46,7 +46,7 @@ def not_found_exception_handler(_: Request, _1: NoResultFound):
     response_model=None,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-async def delete_delete_id(id: UUID) -> Union[None, Error]:
+async def delete_unit(id: UUID) -> Union[None, Error]:
     ident = str(id)
 
     async with SessionLocal.begin() as session:
@@ -58,7 +58,7 @@ async def delete_delete_id(id: UUID) -> Union[None, Error]:
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
-async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
+async def import_units(body: ShopUnitImportRequest) -> Union[None, Error]:
     last_update = body.updateDate
     contains_unit_with_parent = False
     offers_ids = []
@@ -88,7 +88,7 @@ async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     response_model=ShopUnitStatisticResponse,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-async def get_node_id_statistic(
+async def get_node_statistic(
     id: UUID,
     date_start: Optional[datetime] = Query(default=datetime.min, alias="dateStart"),
     date_end: Optional[datetime] = Query(default=datetime.max, alias="dateEnd"),
@@ -103,7 +103,7 @@ async def get_node_id_statistic(
     response_model=ShopUnit,
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
-async def get_nodes_id(id: UUID) -> Union[ShopUnit, Error]:
+async def get_node(id: UUID) -> Union[ShopUnit, Error]:
     async with SessionLocal() as session:
         unit = await DAL(session).get_node(str(id))
         return ShopUnit.from_model(unit)
