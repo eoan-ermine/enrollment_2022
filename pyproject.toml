@@ -16,6 +16,9 @@ SQLAlchemy = "^1.4.37"
 alembic = "^1.8.0"
 aiosqlite = "^0.17.0"
 typer = "^0.4.1"
+pytest = "^7.1.2"
+SQLAlchemy-Utils = "^0.38.2"
+yarl = "^1.7.2"
 
 [tool.poetry.dev-dependencies]
 fastapi-code-generator = "^0.3.5"
