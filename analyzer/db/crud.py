@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import update
@@ -36,13 +37,11 @@ class ShopUnitCRUD:
         return q.scalars().all()
 
     @staticmethod
-    async def update_category(session: Session, category_id: str, units_ids: List[str]):
-        q = await session.execute(
-            select(func.avg(ShopUnit.price), func.max(ShopUnit.last_update))
-            .select_from(ShopUnit)
-            .where(ShopUnit.id.in_(units_ids))
+    async def update_category(session: Session, category_id: str, units_ids: List[str], last_update: datetime):
+        q = await session.scalars(
+            select(func.avg(ShopUnit.price)).select_from(ShopUnit).where(ShopUnit.id.in_(units_ids))
         )
-        price, last_update = q.first()
+        price = q.one()
 
         session.add(PriceUpdate(unit_id=category_id, price=price, date=last_update))
         await session.execute(
@@ -50,13 +49,13 @@ class ShopUnitCRUD:
             .where(ShopUnit.id == category_id)
             .values(
                 price=price,
-                last_update=last_update,
+                last_update=func.max(ShopUnit.last_update, last_update),
             )
             .execution_options(synchronize_session=False)
         )
 
     @staticmethod
-    async def update_categories(session: Session, categories: List[str]):
+    async def update_categories(session: Session, categories: List[str], last_update: datetime):
         units_ids = dict()
 
         q = await session.execute(select(UnitHierarchy).where(UnitHierarchy.parent_id.in_(categories)))
@@ -66,7 +65,8 @@ class ShopUnitCRUD:
             ident, parent_ident = hierarchy.id, hierarchy.parent_id
             if parent_ident not in units_ids:
                 units_ids[parent_ident] = [ident]
-            units_ids[parent_ident].append(ident)
+            else:
+                units_ids[parent_ident].append(ident)
 
         for category in categories:
-            await ShopUnitCRUD.update_category(session, category, units_ids[category])
+            await ShopUnitCRUD.update_category(session, category, units_ids[category], last_update)

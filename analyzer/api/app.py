@@ -66,13 +66,15 @@ async def delete_delete_id(id: UUID) -> Union[None, Error]:
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
     updateDate = body.updateDate
+
     contains_unit_with_parent = False
+    offers_ids = []
 
     async with SessionLocal.begin() as session:
         for unit in body.items:
             unit_id = str(unit.id)
-            parent = str(unit.parentId) if unit.parentId else None
 
+            parent = str(unit.parentId) if unit.parentId else None
             if parent:
                 contains_unit_with_parent = True
 
@@ -87,13 +89,15 @@ async def post_imports(body: ShopUnitImportRequest) -> Union[None, Error]:
             await session.merge(unit)
 
             if not unit.is_category:
+                offers_ids.append(unit_id)
                 price_update = schema.PriceUpdate(unit_id=unit_id, price=unit.price, date=updateDate)
                 session.add(price_update)
 
+    # Следующий код должен выполняться лишь после обработки триггеров на вставку ShopUnit
     if contains_unit_with_parent:
         async with SessionLocal.begin() as session:
-            parents = await ShopUnitCRUD.get_parents_ids(session, [str(unit.id) for unit in body.items])
-            await ShopUnitCRUD.update_categories(session, parents)
+            parents = await ShopUnitCRUD.get_parents_ids(session, offers_ids)
+            await ShopUnitCRUD.update_categories(session, parents, updateDate)
 
 
 @app.get(
