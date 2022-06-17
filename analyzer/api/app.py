@@ -14,7 +14,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
-from analyzer.db.core import SessionLocal
+from analyzer.db.core import SessionLocal, sync_engine
 from analyzer.db.crud import ShopUnitCRUD
 from analyzer.db.utils import IntervalType, model_to_dict
 
@@ -160,3 +160,6 @@ async def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
 
 def start():
     uvicorn.run("analyzer.api.app:app", host="127.0.0.1", port=8080, reload=True)
+    with sync_engine.connect() as connection:
+        connection.execute("pragma vacuum")
+        connection.execute("pragma optimize")
