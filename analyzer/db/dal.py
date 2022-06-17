@@ -81,19 +81,19 @@ class DAL:
 
         return [ShopUnit(**{**model_to_dict(unit), "price": price, "last_update": date}) for price, date in updates]
 
-    async def _retrieve_unit(self, unit: ShopUnit):
+    async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
         unit.children = None
         if unit.is_category:
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
             unit.children = [await self._retrieve_unit(child) for child in q.all()]
         return unit
 
-    async def get_node(self, id: str):
+    async def get_node(self, id: str) -> ShopUnit:
         q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
         unit = q.one()
         return await self._retrieve_unit(unit)
 
-    async def get_sales(self, date: datetime):
+    async def get_sales(self, date: datetime) -> List[ShopUnit]:
         q = await self.session.scalars(
             select(ShopUnit)
             .select_from(ShopUnit)

@@ -65,7 +65,7 @@ async def import_units(body: ShopUnitImportRequest) -> Union[None, Error]:
 
     units = []
     for item in body.items:
-        unit = schema.ShopUnit.parse(item, last_update=last_update)
+        unit = schema.ShopUnit.from_model(item, last_update=last_update)
         if unit.parent_id:
             contains_unit_with_parent = True
         if not unit.is_category:

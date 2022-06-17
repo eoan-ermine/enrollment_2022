@@ -45,7 +45,7 @@ class ShopUnit(BaseModel):
     )
 
     @staticmethod
-    def from_model(model):
+    def from_model(model: "analyzer.db.schema.ShopUnit"):
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
@@ -102,7 +102,7 @@ class ShopUnitStatisticUnit(BaseModel):
     date: datetime = Field(..., description="Время последнего обновления элемента.")
 
     @staticmethod
-    def from_model(model):
+    def from_model(model: "analyzer.db.schema.ShopUnit"):
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
