@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Union
 from uuid import UUID
 
+import typer
 import uvicorn
 from fastapi import FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
@@ -162,8 +163,12 @@ async def get_sales(date: datetime) -> Union[ShopUnitStatisticResponse, Error]:
         return ShopUnitStatisticResponse(items=[ShopUnit.from_model(unit) for unit in q.all()])
 
 
-def start():
-    uvicorn.run("analyzer.api.app:app", host="127.0.0.1", port=8080, reload=True)
+def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False):
+    uvicorn.run("analyzer.api.app:app", host=host, port=port, reload=debug)
     with sync_engine.connect() as connection:
         connection.execute("pragma vacuum")
         connection.execute("pragma optimize")
+
+
+def start():
+    typer.run(main)
