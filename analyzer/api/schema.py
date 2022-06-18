@@ -5,7 +5,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from pydantic.json import ENCODERS_BY_TYPE
 
 # Format of datetimes in unit_tests
@@ -71,6 +71,14 @@ class ShopUnitImport(BaseModel):
     )
     type: ShopUnitType
     price: Optional[int] = Field(None, description="Целое число, для категорий поле должно содержать null.")
+
+    @validator("price")
+    def category_price_null(cls, v, values, **kwargs):
+        # Поле type могло не пройти валидацию, поэтому мы проверяем, есть ли оно в values
+        if "type" in values and values["type"] == ShopUnitType.CATEGORY:
+            if v is not None:
+                raise ValueError("Price of category must be None")
+        return v
 
 
 class ShopUnitImportRequest(BaseModel):

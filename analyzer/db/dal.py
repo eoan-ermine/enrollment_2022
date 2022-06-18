@@ -68,13 +68,11 @@ class DAL:
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         for unit in units:
             model_dictionary = model_to_dict(unit)
-            excluded_fields = ["id", "is_category"]
-
             stmt = (
                 insert(ShopUnit)
                 .values(**model_dictionary)
                 .on_conflict_do_update(
-                    index_elements=["id"], set_={k: v for k, v in model_dictionary.items() if k not in excluded_fields}
+                    index_elements=["id"], set_={k: v for k, v in model_dictionary.items() if k != "id"}
                 )
             )
             await self.session.execute(stmt)
