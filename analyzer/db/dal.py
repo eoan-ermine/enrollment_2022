@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import update
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
@@ -64,7 +65,18 @@ class DAL:
 
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         for unit in units:
-            await self.session.merge(unit)
+            model_dictionary = model_to_dict(unit)
+            excluded_fields = ["id", "is_category"]
+
+            stmt = (
+                insert(ShopUnit)
+                .values(**model_dictionary)
+                .on_conflict_do_update(
+                    index_elements=["id"], set_={k: v for k, v in model_dictionary.items() if k not in excluded_fields}
+                )
+            )
+            await self.session.execute(stmt)
+
             if not unit.is_category:
                 price_update = PriceUpdate(unit_id=unit.id, price=unit.price, date=update_date)
                 self.session.add(price_update)
