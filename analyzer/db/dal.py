@@ -4,6 +4,7 @@ from typing import List, Optional
 from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql import func
 
 from analyzer.utils.misc import IntervalType, model_to_dict
@@ -16,9 +17,10 @@ class DAL:
         self.session = session
 
     async def delete_unit(self, id: str) -> None:
-        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
-        unit = q.one()
-        await self.session.delete(unit)
+        conn = await self.session.connection()
+        q = await conn.execute(ShopUnit.__table__.delete().where(ShopUnit.id == id))
+        if q.rowcount == 0:
+            raise NoResultFound()
 
     async def update_category(
         self, category_id: str, units_ids: List[str], last_update: Optional[datetime] = None
