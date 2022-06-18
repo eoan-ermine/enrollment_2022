@@ -6,8 +6,9 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
+from analyzer.utils.misc import IntervalType, model_to_dict
+
 from .schema import PriceUpdate, ShopUnit, UnitHierarchy
-from .utils import IntervalType, model_to_dict
 
 
 class DAL:
