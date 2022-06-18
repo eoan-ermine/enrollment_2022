@@ -162,4 +162,261 @@ async def test_import(client):
 
     response = await client.get(f"/nodes/{ROOT_ID}")
     assert response.status_code == 200
-    assert compare_nodes(response.json(), EXPECTED_TREE)
+    compare_nodes(response.json(), EXPECTED_TREE)
+
+
+@pytest.mark.asyncio
+async def test_import_update(client):
+    expected_tree = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+        "price": 37499,
+        "parentId": None,
+        "date": "2022-02-02T13:00:00Z",
+        "children": [
+            {
+                "type": "CATEGORY",
+                "name": "Смартфоны",
+                "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 37499,
+                "date": "2022-02-02T13:00:00Z",
+                "children": [
+                    {
+                        "type": "OFFER",
+                        "name": "Samsung 2022",
+                        "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                        "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                        "price": 15000,
+                        "date": "2022-02-02T13:00:00Z",
+                        "children": None,
+                    },
+                    {
+                        "type": "OFFER",
+                        "name": "Xomiа Readme 10",
+                        "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
+                        "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                        "price": 59999,
+                        "date": "2022-02-02T12:00:00Z",
+                        "children": None,
+                    },
+                ],
+            },
+        ],
+    }
+
+    await import_batches(client, IMPORT_BATCHES[:2], 200)
+    await import_batches(
+        client,
+        [
+            {
+                "items": [
+                    {
+                        "type": "OFFER",
+                        "name": "Samsung 2022",
+                        "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                        "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                        "price": 15000,
+                    }
+                ],
+                "updateDate": "2022-02-02T13:00:00Z",
+            }
+        ],
+        200,
+    )
+
+    response = await client.get(f"/nodes/{ROOT_ID}")
+    assert response.status_code == 200
+    compare_nodes(response.json(), expected_tree)
+
+
+@pytest.mark.asyncio
+async def test_import_type_change(client):
+    batches = [
+        {
+            "items": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Товары",
+                    "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                    "parentId": None,
+                },
+                {
+                    "type": "OFFER",
+                    "name": "Item",
+                    "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                    "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                    "price": 1000,
+                },
+            ],
+            "updateDate": "2022-02-01T12:00:00Z",
+        },
+    ]
+
+    await import_batches(client, batches, 200)
+    await import_batches(
+        client,
+        [
+            {
+                "items": [
+                    {
+                        "type": "OFFER",
+                        "name": "Товары",
+                        "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                        "parentId": None,
+                    }
+                ],
+                "updateDate": "2022-02-01T12:00:00Z",
+            }
+        ],
+        400,
+    )
+    await import_batches(
+        client,
+        [
+            {
+                "items": [
+                    {
+                        "type": "CATEGORY",
+                        "name": "Item",
+                        "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                        "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                        "price": None,
+                    }
+                ],
+                "updateDate": "2022-02-01T12:00:00Z",
+            }
+        ],
+        400,
+    )
+
+
+@pytest.mark.asyncio
+async def test_import_category_price(client):
+    batches = [
+        {
+            "items": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Товары",
+                    "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                    "parentId": None,
+                    "price": 1000,
+                }
+            ],
+            "updateDate": "2022-02-01T12:00:00Z",
+        }
+    ]
+    await import_batches(client, batches, 400)
+
+
+@pytest.mark.asyncio
+async def test_import_empty(client):
+    await import_batches(client, [{"items": [], "updateDate": "2022-02-01T12:00:00Z"}], 200)
+
+
+@pytest.mark.asyncio
+async def test_import_change_parent(client):
+    goods_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+    people_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2"
+
+    batches = [
+        {
+            "items": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Товары",
+                    "id": goods_root_id,
+                    "parentId": None,
+                },
+                {
+                    "type": "OFFER",
+                    "name": "Товар",
+                    "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                    "parentId": goods_root_id,
+                    "price": 1000,
+                },
+                {
+                    "type": "CATEGORY",
+                    "name": "Люди",
+                    "id": people_root_id,
+                    "parentId": None,
+                },
+            ],
+            "updateDate": "2022-02-01T12:00:00Z",
+        },
+        {
+            "items": [
+                {
+                    "type": "OFFER",
+                    "name": "Человек",
+                    "id": "863e1a7a-1304-42ae-943b-179184c077e4",
+                    "parentId": people_root_id,
+                    "price": 49000,
+                }
+            ],
+            "updateDate": "2022-02-01T15:00:00Z",
+        },
+        {
+            "items": [
+                {
+                    "type": "OFFER",
+                    "name": "Человек",
+                    "id": "863e1a7a-1304-42ae-943b-179184c077e4",
+                    "parentId": goods_root_id,
+                    "price": 49000,
+                }
+            ],
+            "updateDate": "2022-02-01T16:00:00Z",
+        },
+    ]
+
+    expected_goods_tree = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": goods_root_id,
+        "price": 25000,
+        "parentId": None,
+        "date": "2022-02-01T16:00:00Z",
+        "children": [
+            {
+                "type": "OFFER",
+                "name": "Товар",
+                "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                "price": 1000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T12:00:00Z",
+                "children": None,
+            },
+            {
+                "type": "OFFER",
+                "name": "Человек",
+                "id": "863e1a7a-1304-42ae-943b-179184c077e4",
+                "price": 49000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T16:00:00Z",
+                "children": None,
+            },
+        ],
+    }
+
+    expected_people_tree = {
+        "type": "CATEGORY",
+        "name": "Люди",
+        "id": people_root_id,
+        "price": None,
+        "parentId": None,
+        "date": "2022-02-01T16:00:00Z",
+        "children": None,
+    }
+
+    await import_batches(client, batches, 200)
+
+    response = await client.get(f"/nodes/{goods_root_id}")
+    assert response.status_code == 200
+    compare_nodes(response.json(), expected_goods_tree)
+
+    response = await client.get(f"/nodes/{people_root_id}")
+    assert response.status_code == 200
+    compare_nodes(response.json(), expected_people_tree)
