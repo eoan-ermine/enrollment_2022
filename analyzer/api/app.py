@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -88,7 +89,11 @@ async def import_units(body: ShopUnitImportRequest, session: Session = Depends(g
         units.append(unit)
 
     async with get_dal(session) as dal:
-        await dal.add_units(units, last_update)
+        try:
+            await dal.add_units(units, last_update)
+        except IntegrityError:
+            await session.close()  # Cancel transaction
+            return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
 
     # Следующий код должен выполняться лишь после обработки триггеров на вставку ShopUnit
     if contains_unit_with_parent:
