@@ -58,7 +58,7 @@ class DAL:
 
     async def get_parents_ids(self, units_ids: List[str]) -> None:
         q = await self.session.execute(
-            select(UnitHierarchy.parent_id).where(UnitHierarchy.id.in_(units_ids)).distinct(UnitHierarchy.parent_id)
+            select(UnitHierarchy.parent_id).where(UnitHierarchy.id.in_(units_ids)).distinct()
         )
         return q.scalars().all()
 
