@@ -253,6 +253,25 @@ async def test_import_type_change(client):
             "updateDate": "2022-02-01T12:00:00Z",
         },
     ]
+    expected_tree = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+        "price": 1000,
+        "parentId": None,
+        "date": "2022-02-01T12:00:00Z",
+        "children": [
+            {
+                "type": "OFFER",
+                "name": "Item",
+                "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+                "price": 1000,
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "date": "2022-02-01T12:00:00Z",
+                "children": None,
+            }
+        ],
+    }
 
     await import_batches(client, batches, 200)
     await import_batches(
@@ -290,6 +309,12 @@ async def test_import_type_change(client):
         ],
         400,
     )
+
+    # Проверка, что структура осталась прежней
+
+    response = await client.get(f"/nodes/{ROOT_ID}")
+    assert response.status_code == 200
+    compare_nodes(response.json(), expected_tree)
 
 
 @pytest.mark.asyncio
