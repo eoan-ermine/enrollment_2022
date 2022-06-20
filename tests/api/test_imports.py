@@ -433,7 +433,7 @@ async def test_import_change_parent(client):
         "price": None,
         "parentId": None,
         "date": "2022-02-01T16:00:00Z",
-        "children": None,
+        "children": [],
     }
 
     await import_batches(client, batches, 200)
