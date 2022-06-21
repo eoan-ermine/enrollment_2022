@@ -11,7 +11,7 @@ from analyzer.utils.database import make_alembic_config
 def get_revisions():
     # Создаем объект с конфигурацей alembic (для получения списка миграций БД
     # не нужна).
-    options = SimpleNamespace(config="alembic.ini", sqlite_url=None, name="alembic", raiseerr=False, x=None)
+    options = SimpleNamespace(config="alembic.ini", postgres_url=None, name="alembic", raiseerr=False, x=None)
     config = make_alembic_config(options)
 
     # Получаем директорию с миграциями alembic

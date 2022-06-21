@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import update
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
@@ -39,7 +39,7 @@ class DAL:
         await self.session.execute(
             update(ShopUnit)
             .where(ShopUnit.id == category_id)
-            .values(price=average_price, last_update=func.max(ShopUnit.last_update, last_update))
+            .values(price=average_price, last_update=last_update)
             .execution_options(synchronize_session=False)
         )
 
@@ -68,18 +68,17 @@ class DAL:
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         for unit in units:
             model_dictionary = model_to_dict(unit)
-            stmt = (
+            await self.session.execute(
                 insert(ShopUnit)
                 .values(**model_dictionary)
                 .on_conflict_do_update(
                     index_elements=["id"], set_={k: v for k, v in model_dictionary.items() if k != "id"}
                 )
             )
-            await self.session.execute(stmt)
-
             if not unit.is_category:
-                price_update = PriceUpdate(unit_id=unit.id, price=unit.price, date=update_date)
-                self.session.add(price_update)
+                await self.session.execute(
+                    insert(PriceUpdate).values(unit_id=unit.id, price=unit.price, date=update_date)
+                )
 
     async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
         q = await self.session.execute(select(ShopUnit).where(ShopUnit.id == id))

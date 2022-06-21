@@ -21,7 +21,7 @@ def upgrade() -> None:
         "shop_units",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("parent_id", sa.Integer(), nullable=True),
+        sa.Column("parent_id", sa.String(), nullable=True),
         sa.Column("price", sa.Integer(), nullable=True),
         sa.Column("is_category", sa.Boolean(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -33,9 +33,9 @@ def upgrade() -> None:
     op.create_table(
         "price_updates",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("unit_id", sa.Integer(), nullable=True),
+        sa.Column("unit_id", sa.String(), nullable=True),
         sa.Column("price", sa.Integer(), nullable=True),
-        sa.Column("date", sa.DateTime(), nullable=True),
+        sa.Column("date", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["unit_id"], ["shop_units.id"], name=op.f("fk__price_updates__unit_id__shop_units"), ondelete="CASCADE"
         ),

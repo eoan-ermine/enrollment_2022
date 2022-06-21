@@ -11,12 +11,12 @@ from fastapi import Depends, FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
-from analyzer.db.core import SessionLocal, sync_engine
+from analyzer.db.core import SessionLocal
 from analyzer.db.dal import DAL
 
 from .schema import (
@@ -91,7 +91,7 @@ async def import_units(body: ShopUnitImportRequest, session: Session = Depends(g
     async with get_dal(session) as dal:
         try:
             await dal.add_units(units, last_update)
-        except IntegrityError:
+        except DBAPIError:
             await session.close()  # Cancel transaction
             return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
 
@@ -142,9 +142,6 @@ async def get_sales(date: datetime, session: Session = Depends(get_session)) -> 
 
 def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False):
     uvicorn.run("analyzer.api.app:app", host=host, port=port, reload=debug)
-    with sync_engine.connect() as connection:
-        connection.execute("pragma vacuum")
-        connection.execute("pragma optimize")
 
 
 def start():

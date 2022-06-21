@@ -1,14 +1,13 @@
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_PATH = "./database.db"
-ASYNCHRONOUS_DATABASE_URL = "sqlite+aiosqlite:///" + DATABASE_PATH
-SYNCHRONOUS_DATABASE_URL = "sqlite:///" + DATABASE_PATH
+DATABASE_PATH = "analyzer:root@localhost/analyzer"
+ASYNC_DATABASE_URL = f"postgresql+asyncpg://{DATABASE_PATH}"
+SYNC_DATABASE_URL = f"postgresql+psycopg2://{DATABASE_PATH}"
 
-engine = create_async_engine(ASYNCHRONOUS_DATABASE_URL, future=True)
-sync_engine = create_engine(SYNCHRONOUS_DATABASE_URL.replace("+aiosqlite", ""))
+engine = create_async_engine(ASYNC_DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession)
 
 convention = {
