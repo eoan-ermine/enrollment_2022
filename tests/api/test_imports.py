@@ -445,3 +445,92 @@ async def test_import_change_parent(client):
     response = await client.get(f"/nodes/{people_root_id}")
     assert response.status_code == 200
     compare_nodes(response.json(), expected_people_tree)
+
+
+@pytest.mark.asyncio
+async def test_import_change_parent_category(client):
+    goods_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+    people_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2"
+
+    batches = [
+        {
+            "items": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Товары",
+                    "id": goods_root_id,
+                    "parentId": None,
+                },
+                {
+                    "type": "OFFER",
+                    "name": "Апельсин",
+                    "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                    "parentId": goods_root_id,
+                    "price": 1000,
+                },
+            ],
+            "updateDate": "2022-02-01T12:00:00Z",
+        },
+        {
+            "items": [
+                {"type": "CATEGORY", "name": "Люди", "id": people_root_id, "parentId": None},
+                {
+                    "type": "OFFER",
+                    "name": "Иван",
+                    "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                    "parentId": people_root_id,
+                    "price": 2000,
+                },
+            ],
+            "updateDate": "2022-02-01T13:00:00Z",
+        },
+        {
+            "items": [{"type": "CATEGORY", "name": "Люди", "id": people_root_id, "parentId": goods_root_id}],
+            "updateDate": "2022-02-01T15:00:00Z",
+        },
+    ]
+
+    expected_goods_tree = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": goods_root_id,
+        "price": 1500,
+        "parentId": None,
+        "date": "2022-02-01T15:00:00Z",
+        "children": [
+            {
+                "type": "OFFER",
+                "name": "Апельсин",
+                "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 1000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T12:00:00Z",
+                "children": None,
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Люди",
+                "id": people_root_id,
+                "price": 2000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T15:00:00Z",
+                "children": [
+                    {
+                        "type": "OFFER",
+                        "name": "Иван",
+                        "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                        "price": 2000,
+                        "parentId": people_root_id,
+                        "date": "2022-02-01T13:00:00Z",
+                        "children": None,
+                    }
+                ],
+            },
+        ],
+    }
+
+    await import_batches(client, batches, 200)
+
+    response = await client.get(f"/nodes/{goods_root_id}")
+    assert response.status_code == 200
+    compare_nodes(response.json(), expected_goods_tree)
