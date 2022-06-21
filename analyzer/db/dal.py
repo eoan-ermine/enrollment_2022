@@ -68,13 +68,23 @@ class DAL:
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         for unit in units:
             model_dictionary = model_to_dict(unit)
-            await self.session.execute(
-                insert(ShopUnit)
-                .values(**model_dictionary)
-                .on_conflict_do_update(
-                    index_elements=["id"], set_={k: v for k, v in model_dictionary.items() if k != "id"}
+
+            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
+            old_unit = q.one_or_none()
+
+            if old_unit:
+                if old_unit.parent_id != unit.parent_id:
+                    await self.session.execute(
+                        update(ShopUnit).where(ShopUnit.id == old_unit.parent_id).values(last_update=update_date)
+                    )
+                await self.session.execute(
+                    update(ShopUnit)
+                    .where(ShopUnit.id == unit.id)
+                    .values(**{k: v for k, v in model_dictionary.items() if k != "id"})
                 )
-            )
+            else:
+                await self.session.execute(insert(ShopUnit).values(**model_dictionary))
+
             if not unit.is_category:
                 await self.session.execute(
                     insert(PriceUpdate).values(unit_id=unit.id, price=unit.price, date=update_date)
