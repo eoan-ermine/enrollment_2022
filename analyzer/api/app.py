@@ -1,23 +1,18 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
 import typer
 import uvicorn
-from fastapi import Depends, FastAPI, Query, Request
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
-from analyzer.db.core import SessionLocal
-from analyzer.db.dal import DAL, ForbiddenOperation
+from analyzer.utils.database import get_dal, get_session
 
+from .middleware import add_exception_handling
 from .schema import (
     Error,
     ShopUnit,
@@ -31,32 +26,7 @@ app = FastAPI(
     title="Mega Market Open API",
     version="1.0",
 )
-
-
-@app.exception_handler(RequestValidationError)
-@app.exception_handler(ForbiddenOperation)
-def validation_exception_handler(request: Request, exc: Union[RequestValidationError, ForbiddenOperation]):
-    return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
-
-
-@app.exception_handler(NoResultFound)
-def not_found_exception_handler(_: Request, _1: NoResultFound):
-    return JSONResponse(status_code=404, content=jsonable_encoder(Error(code=404, message="Item not found")))
-
-
-async def get_session():
-    async with SessionLocal() as session:
-        yield session
-
-
-@asynccontextmanager
-async def get_dal(session):
-    client = DAL(session)
-    try:
-        await session.begin()
-        yield client
-    finally:
-        await session.commit()
+add_exception_handling(app)
 
 
 @app.delete(

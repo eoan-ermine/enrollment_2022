@@ -1,9 +1,14 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Union
 
 from alembic.config import Config
+from sqlalchemy.orm import Session
+
+from analyzer.db.core import SessionLocal
+from analyzer.db.dal import DAL
 
 PROJECT_PATH = Path(__file__).parent.parent.resolve()
 
@@ -28,3 +33,18 @@ def make_alembic_config(cmd_opts: Union[SimpleNamespace], base_path: str = PROJE
         config.set_main_option("sqlalchemy.url", cmd_opts.postgres_url)
 
     return config
+
+
+async def get_session() -> Session:
+    async with SessionLocal() as session:
+        yield session
+
+
+@asynccontextmanager
+async def get_dal(session: Session) -> DAL:
+    client = DAL(session)
+    try:
+        await session.begin()
+        yield client
+    finally:
+        await session.commit()
