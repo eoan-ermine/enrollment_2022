@@ -11,13 +11,12 @@ from fastapi import Depends, FastAPI, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
 from analyzer.db.core import SessionLocal
-from analyzer.db.dal import DAL
+from analyzer.db.dal import DAL, ForbiddenOperation
 
 from .schema import (
     Error,
@@ -35,7 +34,8 @@ app = FastAPI(
 
 
 @app.exception_handler(RequestValidationError)
-def validation_exception_handler(request: Request, exc: RequestValidationError):
+@app.exception_handler(ForbiddenOperation)
+def validation_exception_handler(request: Request, exc: Union[RequestValidationError, ForbiddenOperation]):
     return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
 
 
@@ -65,41 +65,23 @@ async def get_dal(session):
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
 async def delete_unit(id: UUID, session: Session = Depends(get_session)) -> Union[None, Error]:
-    ident = str(id)
-
     async with get_dal(session) as dal:
-        parents = await dal.get_parents_ids([ident])
-        await dal.delete_unit(ident)
-        await dal.update_categories(parents)
+        await dal.delete_unit(str(id))
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 async def import_units(body: ShopUnitImportRequest, session: Session = Depends(get_session)) -> Union[None, Error]:
     last_update = body.updateDate
-    contains_unit_with_parent = False
-    offers_ids = []
 
-    units = []
-    for item in body.items:
-        unit = schema.ShopUnit.from_model(item, last_update=last_update)
-        if unit.parent_id:
-            contains_unit_with_parent = True
-        if not unit.is_category:
-            offers_ids.append(unit.id)
-        units.append(unit)
-
+    updates = []
     async with get_dal(session) as dal:
-        try:
-            await dal.add_units(units, last_update)
-        except DBAPIError:
-            await session.close()  # Cancel transaction
-            return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
+        updates = await dal.add_units(
+            [schema.ShopUnit.from_model(item, last_update=last_update) for item in body.items], last_update
+        )
 
-    # Следующий код должен выполняться лишь после обработки триггеров на вставку ShopUnit
-    if contains_unit_with_parent:
-        async with get_dal(session) as dal:
-            parents = await dal.get_parents_ids(offers_ids)
-            await dal.update_categories(parents, last_update)
+    # Апдейты должны выполняться после строго после создания всех юнитов и иерархии
+    async with get_dal(session) as dal:
+        await dal.apply_updates(updates, last_update)
 
 
 @app.get(
