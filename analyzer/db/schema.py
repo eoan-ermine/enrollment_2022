@@ -49,18 +49,18 @@ class UnitHierarchy(Base):
     __tablename__ = "units_hierarchy"
 
     parent_id = Column(
-        Integer, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False
+        String, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False
     )
     parent_rel = relationship("ShopUnit", foreign_keys=[parent_id], passive_deletes=True)
 
-    id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False)
+    id = Column(String, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False)
     id_rel = relationship("ShopUnit", foreign_keys=[id], passive_deletes=True)
 
 
 class CategoryInfo(Base):
     __tablename__ = "category_info"
 
-    id = Column(Integer, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False)
+    id = Column(String, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False)
     id_rel = relationship("ShopUnit", passive_deletes=True)
 
     sum = Column(Integer, nullable=False)
