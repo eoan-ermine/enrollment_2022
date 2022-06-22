@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
 import typer
 import uvicorn
-from fastapi import Depends, FastAPI, Query, Request
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from fastapi import Depends, FastAPI, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import NoResultFound
 
 from analyzer.db import schema
-from analyzer.db.core import SessionLocal, sync_engine
-from analyzer.db.dal import DAL
+from analyzer.utils.database import get_dal, get_session
 
+from .middleware import add_exception_handling
 from .schema import (
     Error,
     ShopUnit,
@@ -32,31 +26,7 @@ app = FastAPI(
     title="Mega Market Open API",
     version="1.0",
 )
-
-
-@app.exception_handler(RequestValidationError)
-def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
-
-
-@app.exception_handler(NoResultFound)
-def not_found_exception_handler(_: Request, _1: NoResultFound):
-    return JSONResponse(status_code=404, content=jsonable_encoder(Error(code=404, message="Item not found")))
-
-
-async def get_session():
-    async with SessionLocal() as session:
-        yield session
-
-
-@asynccontextmanager
-async def get_dal(session):
-    client = DAL(session)
-    try:
-        await session.begin()
-        yield client
-    finally:
-        await session.commit()
+add_exception_handling(app)
 
 
 @app.delete(
@@ -65,41 +35,23 @@ async def get_dal(session):
     responses={"400": {"model": Error}, "404": {"model": Error}},
 )
 async def delete_unit(id: UUID, session: Session = Depends(get_session)) -> Union[None, Error]:
-    ident = str(id)
-
     async with get_dal(session) as dal:
-        parents = await dal.get_parents_ids([ident])
-        await dal.delete_unit(ident)
-        await dal.update_categories(parents)
+        await dal.delete_unit(str(id))
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
 async def import_units(body: ShopUnitImportRequest, session: Session = Depends(get_session)) -> Union[None, Error]:
     last_update = body.updateDate
-    contains_unit_with_parent = False
-    offers_ids = []
 
-    units = []
-    for item in body.items:
-        unit = schema.ShopUnit.from_model(item, last_update=last_update)
-        if unit.parent_id:
-            contains_unit_with_parent = True
-        if not unit.is_category:
-            offers_ids.append(unit.id)
-        units.append(unit)
-
+    updates = []
     async with get_dal(session) as dal:
-        try:
-            await dal.add_units(units, last_update)
-        except IntegrityError:
-            await session.close()  # Cancel transaction
-            return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
+        updates = await dal.add_units(
+            [schema.ShopUnit.from_model(item, last_update=last_update) for item in body.items], last_update
+        )
 
-    # Следующий код должен выполняться лишь после обработки триггеров на вставку ShopUnit
-    if contains_unit_with_parent:
-        async with get_dal(session) as dal:
-            parents = await dal.get_parents_ids(offers_ids)
-            await dal.update_categories(parents, last_update)
+    # Апдейты должны выполняться после строго после создания всех юнитов и иерархии
+    async with get_dal(session) as dal:
+        await dal.apply_updates(updates, last_update)
 
 
 @app.get(
@@ -142,9 +94,6 @@ async def get_sales(date: datetime, session: Session = Depends(get_session)) -> 
 
 def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False):
     uvicorn.run("analyzer.api.app:app", host=host, port=port, reload=debug)
-    with sync_engine.connect() as connection:
-        connection.execute("pragma vacuum")
-        connection.execute("pragma optimize")
 
 
 def start():

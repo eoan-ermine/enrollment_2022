@@ -9,14 +9,14 @@ from analyzer.api.app import app, get_session
 
 
 @pytest.fixture
-def migrated_sqlite(alembic_config, sqlite):
+def migrated_postgres(alembic_config, postgres):
     upgrade(alembic_config, "head")
-    return sqlite
+    return postgres
 
 
 @pytest_asyncio.fixture
-async def session(migrated_sqlite):
-    engine = create_async_engine(migrated_sqlite.replace("sqlite", "sqlite+aiosqlite"), future=True)
+async def session(migrated_postgres):
+    engine = create_async_engine(migrated_postgres.replace("psycopg2", "asyncpg"), future=True)
     SessionLocal = sessionmaker(
         bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession
     )
