@@ -110,11 +110,11 @@ class ShopUnitStatisticUnit(BaseModel):
     date: datetime = Field(..., description="Время последнего обновления элемента.")
 
     @staticmethod
-    def from_model(model: "analyzer.db.schema.ShopUnit"):
+    def from_model(model):
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
-            date=model.last_update,
+            date=model.date,
             parentId=UUID(model.parent_id) if model.parent_id else None,
             type=ShopUnitType.CATEGORY if model.is_category else ShopUnitType.OFFER,
             price=model.price,
