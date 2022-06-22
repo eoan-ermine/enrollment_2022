@@ -8,12 +8,12 @@ from httpx import AsyncClient
 from analyzer.api.schema import ShopUnitImportRequest
 
 
-def deep_sort_children(node):
-    if node.get("children"):
-        node["children"].sort(key=lambda x: x["id"])
+def deep_sort(node, key):
+    if node.get(key):
+        node[key].sort(key=lambda x: x["id"])
 
-        for child in node["children"]:
-            deep_sort_children(child)
+        for child in node[key]:
+            deep_sort(child, key)
 
 
 def print_diff(expected, response):
@@ -33,9 +33,10 @@ def print_diff(expected, response):
     return completed_process.stdout
 
 
-def compare_nodes(lhs, rhs):
-    deep_sort_children(lhs)
-    deep_sort_children(rhs)
+def compare_result(lhs, rhs, sort_key=None):
+    if sort_key:
+        deep_sort(lhs, sort_key)
+        deep_sort(rhs, sort_key)
 
     import json
 
@@ -46,6 +47,16 @@ def compare_nodes(lhs, rhs):
 
     diff = difflib.unified_diff(left.splitlines(True), right.splitlines(True), fromfile="left", tofile="right")
     assert lhs == rhs, "\n" + "".join(diff)
+
+
+def compare_nodes(lhs, rhs):
+    compare_result(lhs, rhs, "children")
+
+
+def compare_statistics(lhs, rhs):
+    lhs["items"] = sorted(lhs["items"], key=lambda x: x["price"])
+    rhs["items"] = sorted(rhs["items"], key=lambda x: x["price"])
+    compare_result(lhs, rhs)
 
 
 async def import_batches(client: AsyncClient, batches: List[ShopUnitImportRequest], expected_status: int):

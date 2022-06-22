@@ -1,6 +1,6 @@
 import pytest
 
-from analyzer.utils.testing import compare_nodes, import_batches
+from analyzer.utils.testing import compare_statistics, import_batches
 from tests.api.test_imports import IMPORT_BATCHES
 
 
@@ -60,11 +60,11 @@ async def test_sales_corner_dates(client):
 
     end_corner_response = await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"})
     assert end_corner_response.status_code == 200
-    compare_nodes(end_corner_response.json(), expected_tree_end_corner)
+    compare_statistics(end_corner_response.json(), expected_tree_end_corner)
 
     begin_corner_response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
     assert begin_corner_response.status_code == 200
-    compare_nodes(begin_corner_response.json(), expected_tree_begin_corner)
+    compare_statistics(begin_corner_response.json(), expected_tree_begin_corner)
 
 
 @pytest.mark.asyncio
@@ -110,7 +110,7 @@ async def test_sales_update(client):
 
     response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
     assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    compare_statistics(response.json(), expected_tree)
 
 
 @pytest.mark.asyncio
@@ -131,4 +131,4 @@ async def test_sales_delete(client):
 
     response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
     assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    compare_statistics(response.json(), expected_tree)
