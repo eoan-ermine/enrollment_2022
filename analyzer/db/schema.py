@@ -27,7 +27,7 @@ class ShopUnit(Base):
             id=str(model.id),
             name=model.name,
             parent_id=str(model.parentId) if model.parentId else None,
-            price=model.price if model.price else 0,
+            price=model.price,
             is_category=model.type == schema.ShopUnitType.CATEGORY,
             last_update=last_update,
         )
@@ -48,13 +48,8 @@ class PriceUpdate(Base):
 class UnitHierarchy(Base):
     __tablename__ = "units_hierarchy"
 
-    parent_id = Column(
-        String, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False
-    )
-    parent_rel = relationship("ShopUnit", foreign_keys=[parent_id], passive_deletes=True)
-
-    id = Column(String, ForeignKey("shop_units.id", ondelete="CASCADE"), primary_key=True, index=True, nullable=False)
-    id_rel = relationship("ShopUnit", foreign_keys=[id], passive_deletes=True)
+    parent_id = Column(String, primary_key=True, index=True, nullable=False)
+    id = Column(String, primary_key=True, index=True, nullable=False)
 
 
 class CategoryInfo(Base):
