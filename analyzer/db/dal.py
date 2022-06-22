@@ -251,17 +251,21 @@ class DAL:
             await update_query.flush(self.session, parents, update_date)
 
     async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
-        q = await self.session.execute(select(ShopUnit).where(ShopUnit.id == id))
-        unit = q.scalars().one()
-
         q = await self.session.execute(
-            select(PriceUpdate.price, PriceUpdate.date)
-            .where(PriceUpdate.unit_id == id)
+            select(
+                ShopUnit.id,
+                ShopUnit.name,
+                ShopUnit.parent_id,
+                PriceUpdate.price,
+                ShopUnit.is_category,
+                PriceUpdate.date,
+            )
+            .select_from(ShopUnit)
+            .where(ShopUnit.id == id)
             .where(IntervalType.OPENED(PriceUpdate.date, date_start, date_end))
+            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
-        updates = q.all()
-
-        return [ShopUnit(**{**model_to_dict(unit), "price": price, "last_update": date}) for price, date in updates]
+        return q.all()
 
     async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
         unit.children = None
@@ -276,8 +280,15 @@ class DAL:
         return await self._retrieve_unit(unit)
 
     async def get_sales(self, date: datetime) -> List[ShopUnit]:
-        q = await self.session.scalars(
-            select(ShopUnit)
+        q = await self.session.execute(
+            select(
+                ShopUnit.id,
+                ShopUnit.name,
+                ShopUnit.parent_id,
+                PriceUpdate.price,
+                ShopUnit.is_category,
+                PriceUpdate.date,
+            )
             .select_from(ShopUnit)
             .where(ShopUnit.is_category == False)
             .where(IntervalType.CLOSED(PriceUpdate.date, date - timedelta(days=1), date))
