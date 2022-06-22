@@ -16,29 +16,29 @@ class ForbiddenOperation(RuntimeError):
     pass
 
 
-class UpdateType(Enum):
+class UnitUpdateType(Enum):
     ADD = 0
     DELETE = 1
     CHANGE = 2
     REPLACE = 3
 
 
-class Update:
+class UnitUpdate:
     def __init__(
         self,
-        update_type: UpdateType,
+        update_type: UnitUpdateType,
         unit: Optional[ShopUnit] = None,
         old_unit: Optional[ShopUnit] = None,
         sumDiff: Optional[int] = None,
         countDiff: Optional[int] = None,
     ):
-        if update_type == UpdateType.ADD:
+        if update_type == UnitUpdateType.ADD:
             self.sumDiff = unit.price
             self.countDiff = 1
-        elif update_type == UpdateType.DELETE:
+        elif update_type == UnitUpdateType.DELETE:
             self.sumDiff = -unit.price
             self.countDiff = -1
-        elif update_type == UpdateType.REPLACE:
+        elif update_type == UnitUpdateType.REPLACE:
             self.sumDiff = unit.price - old_unit.price
             self.countDiff = 0
         else:
@@ -46,7 +46,7 @@ class Update:
             self.countDiff = countDiff
 
 
-class Updates(dict):
+class UnitUpdates(dict):
     def __getitem__(self, key):
         if key not in self:
             super().__setitem__(key, list())
@@ -56,34 +56,34 @@ class Updates(dict):
 class UpdateQuery:
     def __init__(self):
         self.date_updates = set()
-        self.price_updates = Updates()
+        self.unit_updates = UnitUpdates()
 
     def __bool__(self):
-        return bool(self.date_updates) or bool(self.price_updates)
+        return bool(self.date_updates) or bool(self.unit_updates)
 
     def add_date_update(self, category_id: Optional[str]):
         if category_id is None:
             return
         self.date_updates.add(category_id)
 
-    def add_price_update(self, category_id: Optional[str], update: Update):
+    def add_price_update(self, category_id: Optional[str], update: UnitUpdate):
         if category_id is None:
             return
-        self.price_updates[category_id].append(update)
+        self.unit_updates[category_id].append(update)
 
     def get_updating_ids(self):
-        return list(self.date_updates) + list(self.price_updates.keys())
+        return list(self.date_updates) + list(self.unit_updates.keys())
 
     async def flush_date_updates(self, session, parents: Dict[str, List[str]], update_date: datetime):
         all_parents = set([x for xs in [[key] + parents[key] for key in self.date_updates] for x in xs])
         await session.execute(update(ShopUnit).where(ShopUnit.id.in_(all_parents)).values(last_update=update_date))
 
     async def flush_price_updates(self, session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None):
-        all_parents = set([x for xs in [[key] + parents[key] for key in self.price_updates.keys()] for x in xs])
+        all_parents = set([x for xs in [[key] + parents[key] for key in self.unit_updates.keys()] for x in xs])
         totalSumDiff = {}
         totalCountDiff = {}
 
-        for parent_id, updates in self.price_updates.items():
+        for parent_id, updates in self.unit_updates.items():
             current_parents = [parent_id] + parents[parent_id]
 
             sumDiff = sum([e.sumDiff for e in updates])
@@ -160,10 +160,10 @@ class DAL:
         if unit.parent_id:
             if unit.is_category:
                 totalSum, childsCount = await self._get_category_info(unit.id)
-                query.add_price_update(unit.parent_id, Update(UpdateType.CHANGE, -totalSum, -childsCount))
+                query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, -totalSum, -childsCount))
                 await self._delete_hierarchy(unit)
             else:
-                query.add_price_update(unit.parent_id, Update(UpdateType.DELETE, unit))
+                query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, unit))
 
         await query.flush(self.session, await self.get_parents_ids([unit.parent_id]))
         await self.session.delete(unit)
@@ -202,7 +202,7 @@ class DAL:
                     if unit.parent_id:
                         await self._build_hierarchy(unit)
                 else:
-                    update_query.add_price_update(unit.parent_id, Update(UpdateType.ADD, unit))
+                    update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.ADD, unit))
             else:
                 if unit.is_category != old_unit.is_category:
                     await self.session.close()
@@ -211,21 +211,22 @@ class DAL:
                 if old_unit.parent_id != unit.parent_id:
                     update_query.add_date_update(old_unit.parent_id)
                     if not unit.is_category:
-                        update_query.add_price_update(old_unit.parent_id, Update(UpdateType.DELETE, old_unit))
-                        update_query.add_price_update(unit.parent_id, Update(UpdateType.ADD, unit))
+                        update_query.add_price_update(old_unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, old_unit))
+                        update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.ADD, unit))
                     else:
                         totalSum, childsCount = await self._get_category_info(unit.id)
                         update_query.add_price_update(
-                            old_unit.parent_id, Update(UpdateType.CHANGE, sumDiff=-totalSum, countDiff=-childsCount)
+                            old_unit.parent_id,
+                            UnitUpdate(UnitUpdateType.CHANGE, sumDiff=-totalSum, countDiff=-childsCount),
                         )
                         update_query.add_price_update(
-                            unit.parent_id, Update(UpdateType.CHANGE, sumDiff=totalSum, countDiff=childsCount)
+                            unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sumDiff=totalSum, countDiff=childsCount)
                         )
 
                         await self._delete_hierarchy(unit)
                         await self._build_hierarchy(unit)
                 else:
-                    update_query.add_price_update(unit.parent_id, Update(UpdateType.REPLACE, unit, old_unit))
+                    update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.REPLACE, unit, old_unit))
 
                 await self.session.execute(
                     update(ShopUnit).where(ShopUnit.id == unit.id).values(**self.get_update_values(unit))
