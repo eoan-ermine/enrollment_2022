@@ -281,10 +281,17 @@ async def test_import_type_change(client):
                 "items": [
                     {
                         "type": "OFFER",
+                        "name": "Item 2",
+                        "id": "863e1a7a-1304-42ae-943b-179184c077e4",
+                        "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                        "price": 2000,
+                    },
+                    {
+                        "type": "OFFER",
                         "name": "Товары",
                         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
                         "parentId": None,
-                    }
+                    },
                 ],
                 "updateDate": "2022-02-01T12:00:00Z",
             }
