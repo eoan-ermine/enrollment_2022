@@ -124,12 +124,14 @@ class UpdateQuery:
             await self.flush_price_updates(session, parents)
 
 
-class DAL:
+class UnitHierarchyManager:
     def __init__(self, session: Session):
         self.session = session
-        self.updateQuery = UpdateQuery()
 
-    async def _build_hierarchy(self, category: ShopUnit):
+    async def delete(self, category: ShopUnit):
+        await self.session.execute(delete(UnitHierarchy).where(UnitHierarchy.id == category.id))
+
+    async def build(self, category: ShopUnit):
         parent_id = category.parent_id
         await self.session.execute(insert(UnitHierarchy).values(parent_id=category.parent_id, id=category.id))
 
@@ -140,10 +142,17 @@ class DAL:
             if parent_id is None:
                 break
 
-            insert(UnitHierarchy).values(parent_id=parent_id, id=category.id)
+            await self.session.execute(insert(UnitHierarchy).values(parent_id=parent_id, id=category.id))
 
-    async def _delete_hierarchy(self, category: ShopUnit):
-        await self.session.execute(delete(UnitHierarchy).where(UnitHierarchy.id == category.id))
+    async def rebuild(self, category):
+        await self.delete(category)
+        await self.build(category)
+
+
+class DAL:
+    def __init__(self, session: Session):
+        self.session = session
+        self.updateQuery = UpdateQuery()
 
     async def _get_category_info(self, category_id: str):
         q = await self.session.execute(
@@ -200,7 +209,7 @@ class DAL:
                 if unit.is_category:
                     self.session.add(CategoryInfo(id=unit.id, sum=0, count=0))
                     if unit.parent_id:
-                        await self._build_hierarchy(unit)
+                        await UnitHierarchyManager(self.session).build(unit)
                 else:
                     update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.ADD, unit))
             else:
@@ -223,8 +232,7 @@ class DAL:
                             unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sumDiff=totalSum, countDiff=childsCount)
                         )
 
-                        await self._delete_hierarchy(unit)
-                        await self._build_hierarchy(unit)
+                        await UnitHierarchyManager(self.session).build(unit)
                 else:
                     update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.REPLACE, unit, old_unit))
 
