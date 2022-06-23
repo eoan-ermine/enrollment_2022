@@ -169,8 +169,10 @@ class DAL:
         if unit.parent_id:
             if unit.is_category:
                 totalSum, childsCount = await self._get_category_info(unit.id)
-                query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, -totalSum, -childsCount))
-                await self._delete_hierarchy(unit)
+                query.add_price_update(
+                    unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sumDiff=-totalSum, countDiff=-childsCount)
+                )
+                await UnitHierarchyManager(self.session).delete(unit)
             else:
                 query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, unit))
 
