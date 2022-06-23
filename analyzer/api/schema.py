@@ -128,3 +128,18 @@ class ShopUnitStatisticResponse(BaseModel):
 class Error(BaseModel):
     code: int
     message: str
+
+
+class ShopUnitStatisticRequest(BaseModel):
+    id: UUID
+    date_start: datetime
+    date_end: datetime
+
+    @validator("date_end")
+    def validate_range(cls, value, values, **kwargs):
+        # date_start точно прошло валидацию, т.к. изначально прошло валидацию в обработчике эндпоинта
+        if values["date_start"] >= value:
+            raise ValueError(
+                f"{values['date_start']} and {value} must define valid half-opened interval [date_start; date_end)"
+            )
+        return value
