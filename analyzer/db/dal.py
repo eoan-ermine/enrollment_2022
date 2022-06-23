@@ -2,12 +2,12 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional
 
-from sqlalchemy import delete, update
+from sqlalchemy import and_, delete, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
-from analyzer.utils.misc import IntervalType, model_to_dict
+from analyzer.utils.misc import model_to_dict
 
 from .schema import CategoryInfo, PriceUpdate, ShopUnit, UnitHierarchy
 
@@ -267,7 +267,7 @@ class DAL:
             )
             .select_from(ShopUnit)
             .where(ShopUnit.id == id)
-            .where(IntervalType.OPENED(PriceUpdate.date, date_start, date_end))
+            .where(and_(PriceUpdate.date >= date_start, PriceUpdate.date < date_end))
             .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
         return q.all()
@@ -296,7 +296,7 @@ class DAL:
             )
             .select_from(ShopUnit)
             .where(ShopUnit.is_category == False)
-            .where(IntervalType.CLOSED(PriceUpdate.date, date - timedelta(days=1), date))
+            .where(and_(PriceUpdate.date >= date - timedelta(days=1), PriceUpdate.date <= date))
             .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
         return q.all()
