@@ -43,6 +43,9 @@ class UnitUpdate:
             self.sum_diff = sum_diff
             self.count_diff = count_diff
 
+    def __repr__(self):
+        return f"{self.__class__}({self.sum_diff}, {self.count_diff})"
+
 
 class UnitUpdates(dict):
     def __getitem__(self, key: str) -> List[ShopUnit]:
@@ -97,7 +100,8 @@ class UnitUpdateQuery:
                 update(CategoryInfo)
                 .where(CategoryInfo.id == parent_id)
                 .values(
-                    sum=CategoryInfo.sum + total_sum_diff[parent], count=CategoryInfo.count + total_count_diff[parent]
+                    sum=CategoryInfo.sum + total_sum_diff[parent_id],
+                    count=CategoryInfo.count + total_count_diff[parent_id],
                 )
                 .returning(CategoryInfo.sum.label("sum"), CategoryInfo.count.label("count"))
             )
