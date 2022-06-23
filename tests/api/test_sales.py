@@ -1,6 +1,10 @@
 import pytest
 
-from analyzer.utils.testing import compare_statistics, import_batches
+from analyzer.utils.testing import (
+    assert_response,
+    assert_statistics_response,
+    import_batches,
+)
 from tests.api.test_imports import IMPORT_BATCHES
 
 
@@ -8,8 +12,7 @@ from tests.api.test_imports import IMPORT_BATCHES
 async def test_sales(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.get("/sales", params={"date": "2022-02-04T00:00:00Z"})
-    assert response.status_code == 200
+    assert_response(await client.get("/sales", params={"date": "2022-02-04T00:00:00Z"}), 200)
 
 
 @pytest.mark.asyncio
@@ -58,13 +61,12 @@ async def test_sales_corner_dates(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    end_corner_response = await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"})
-    assert end_corner_response.status_code == 200
-    compare_statistics(end_corner_response.json(), expected_tree_end_corner)
-
-    begin_corner_response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
-    assert begin_corner_response.status_code == 200
-    compare_statistics(begin_corner_response.json(), expected_tree_begin_corner)
+    assert_statistics_response(
+        await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"}), 200, expected_tree_end_corner
+    )
+    assert_statistics_response(
+        await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"}), 200, expected_tree_begin_corner
+    )
 
 
 @pytest.mark.asyncio
@@ -108,9 +110,7 @@ async def test_sales_update(client):
     await import_batches(client, IMPORT_BATCHES, 200)
     await import_batches(client, batches, 200)
 
-    response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
-    assert response.status_code == 200
-    compare_statistics(response.json(), expected_tree)
+    assert_statistics_response(await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"}), 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -126,9 +126,5 @@ async def test_sales_delete(client):
 
     await import_batches(client, batches, 200)
 
-    response = await client.delete(f"/delete/{unit_id}")
-    assert response.status_code == 200
-
-    response = await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"})
-    assert response.status_code == 200
-    compare_statistics(response.json(), expected_tree)
+    assert_response(await client.delete(f"/delete/{unit_id}"), 200)
+    assert_statistics_response(await client.get("/sales", params={"date": "2022-02-04T15:00:00Z"}), 200, expected_tree)

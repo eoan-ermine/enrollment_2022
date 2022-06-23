@@ -1,6 +1,11 @@
 import pytest
 
-from analyzer.utils.testing import compare_nodes, import_batches
+from analyzer.utils.testing import (
+    assert_nodes_response,
+    assert_response,
+    assert_statistics_response,
+    import_batches,
+)
 from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
 
 
@@ -8,11 +13,8 @@ from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
 async def test_delete(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.delete(f"/delete/{ROOT_ID}")
-    assert response.status_code == 200
-
-    response = await client.delete(f"/delete/{ROOT_ID}")
-    assert response.status_code == 404
+    assert_response(await client.delete(f"/delete/{ROOT_ID}"), 200)
+    assert_response(await client.delete(f"/delete/{ROOT_ID}"), 404)
 
 
 @pytest.mark.asyncio
@@ -50,12 +52,8 @@ async def test_delete_category_item(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.delete(f"/delete/{item_id}")
-    assert response.status_code == 200
-
-    response = await client.get(f"/nodes/{category_id}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_response(await client.delete(f"/delete/{item_id}"), 200)
+    assert_nodes_response(await client.get(f"/nodes/{category_id}"), 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -108,25 +106,16 @@ async def test_delete_category(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.delete(f"/delete/{category_id}")
-    assert response.status_code == 200
-
-    response = await client.get(f"/nodes/{ROOT_ID}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_response(await client.delete(f"/delete/{category_id}"), 200)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
 
     for item_id in items_ids:
-        response = await client.get(f"/nodes/{item_id}")
-        assert response.status_code == 404
+        assert_response(await client.get(f"/nodes/{item_id}"), 404)
 
 
 @pytest.mark.asyncio
 async def test_delete_history(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.delete(f"/delete/{ROOT_ID}")
-    assert response.status_code == 200
-
-    response = await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"})
-    assert response.status_code == 200
-    assert response.json() == {"items": []}
+    assert_response(await client.delete(f"/delete/{ROOT_ID}"), 200)
+    assert_statistics_response(await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"}), 200, {"items": []})

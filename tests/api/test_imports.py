@@ -1,6 +1,6 @@
 import pytest
 
-from analyzer.utils.testing import compare_nodes, import_batches
+from analyzer.utils.testing import assert_nodes_response, import_batches
 
 ROOT_ID = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
 IMPORT_BATCHES = [
@@ -160,9 +160,7 @@ EXPECTED_TREE = {
 async def test_import(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    response = await client.get(f"/nodes/{ROOT_ID}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), EXPECTED_TREE)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, EXPECTED_TREE)
 
 
 @pytest.mark.asyncio
@@ -226,9 +224,7 @@ async def test_import_update(client):
         200,
     )
 
-    response = await client.get(f"/nodes/{ROOT_ID}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -319,9 +315,7 @@ async def test_import_type_change(client):
 
     # Проверка, что структура осталась прежней
 
-    response = await client.get(f"/nodes/{ROOT_ID}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -445,13 +439,8 @@ async def test_import_change_parent(client):
 
     await import_batches(client, batches, 200)
 
-    response = await client.get(f"/nodes/{goods_root_id}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_goods_tree)
-
-    response = await client.get(f"/nodes/{people_root_id}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_people_tree)
+    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
+    assert_nodes_response(await client.get(f"/nodes/{people_root_id}"), 200, expected_people_tree)
 
 
 @pytest.mark.asyncio
@@ -538,6 +527,4 @@ async def test_import_change_parent_category(client):
 
     await import_batches(client, batches, 200)
 
-    response = await client.get(f"/nodes/{goods_root_id}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_goods_tree)
+    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)

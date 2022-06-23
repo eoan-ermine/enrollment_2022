@@ -1,9 +1,9 @@
 import json
 import os
 import subprocess
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 
 from analyzer.api.schema import ShopUnitImportRequest
 
@@ -81,3 +81,17 @@ def expected_statistics(info: List[Tuple[str, str, str, str, str, int]]):
             for unit_type, name, unit_id, parent_id, date, price in info
         ]
     }
+
+
+def assert_response(response: Response, status_code: int):
+    assert response.status_code == status_code
+
+
+def assert_nodes_response(response: Response, status_code: int, expected_result: Dict):
+    assert_response(response, status_code)
+    compare_nodes(response.json(), expected_result)
+
+
+def assert_statistics_response(response: Response, status_code: int, expected_result: Dict):
+    assert_response(response, status_code)
+    compare_statistics(response.json(), expected_result)

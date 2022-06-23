@@ -2,7 +2,11 @@ from uuid import uuid4
 
 import pytest
 
-from analyzer.utils.testing import compare_nodes, import_batches
+from analyzer.utils.testing import (
+    assert_nodes_response,
+    assert_response,
+    import_batches,
+)
 from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
 
 
@@ -20,9 +24,7 @@ async def test_nodes_category(client):
 
     await import_batches(client, IMPORT_BATCHES[:1], 200)
 
-    response = await client.get(f"/nodes/{ROOT_ID}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -54,23 +56,17 @@ async def test_nodes_offer(client):
 
     await import_batches(client, batches, 200)
 
-    response = await client.get(f"/nodes/{item_id}")
-    assert response.status_code == 200
-    compare_nodes(response.json(), expected_tree)
+    assert_nodes_response(await client.get(f"/nodes/{item_id}"), 200, expected_tree)
 
 
 @pytest.mark.asyncio
 async def test_nodes_not_found(client):
     random_uuid = str(uuid4())
 
-    response = await client.get(f"/nodes/{random_uuid}")
-    assert response.status_code == 404
+    assert_response(await client.get(f"/nodes/{random_uuid}"), 404)
 
 
 @pytest.mark.asyncio
 async def test_delete_invalid(client):
-    response = await client.get("/nodes/invalid_uuid")
-    assert response.status_code == 400
-
-    response = await client.get("/nodes/12345")
-    assert response.status_code == 400
+    assert_response(await client.get("/nodes/invalid_uuid"), 400)
+    assert_response(await client.get("/nodes/12345"), 400)
