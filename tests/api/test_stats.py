@@ -109,7 +109,7 @@ async def tests_stats_omit_borders(client):
                     "OFFER",
                     'Goldstar 65" LED UHD LOL Very Smart',
                     node_id,
-                    "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                    None,
                     date,
                     price,
                 )
@@ -121,7 +121,7 @@ async def tests_stats_omit_borders(client):
 
     response = await client.get(f"/node/{node_id}/statistic", params={"dateEnd": "2022-02-03T15:00:00Z"})
     assert response.status_code == 200
-    compare_statistics(response.json(), expected_unit_statistics([(datetime_min, 100)]))
+    compare_statistics(response.json(), expected_unit_statistics([(datetime_min, 1000)]))
 
     response = await client.get(f"/node/{node_id}/statistic", params={"dateStart": "2022-02-03T15:00:00Z"})
     assert response.status_code == 200
@@ -129,7 +129,7 @@ async def tests_stats_omit_borders(client):
 
     response = await client.get(f"/node/{node_id}/statistic")
     assert response.status_code == 200
-    compare_statistics(response.json(), expected_unit_statistics([(datetime_min, 100), (datetime_max, 100000)]))
+    compare_statistics(response.json(), expected_unit_statistics([(datetime_min, 1000), (datetime_max, 100000)]))
 
 
 @pytest.mark.asyncio
@@ -227,6 +227,6 @@ async def tests_stats_categories(client):
     compare_statistics(
         response.json(),
         expected_goods_statistics(
-            [("2022-02-02T12:00:00Z", 69999), ("2022-02-02T12:00:00Z", 55749), ("2022-02-03T15:00:00Z", 58599)]
+            [("2022-02-02T12:00:00Z", 69999), ("2022-02-03T12:00:00Z", 55749), ("2022-02-03T15:00:00Z", 58599)]
         ),
     )
