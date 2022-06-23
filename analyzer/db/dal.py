@@ -1,182 +1,74 @@
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Dict, List, Optional
+from __future__ import annotations
 
-from sqlalchemy import and_, delete, update
-from sqlalchemy.dialects.postgresql import insert
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple
+
+from sqlalchemy import and_, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import Join
 
 from analyzer.utils.misc import model_to_dict
 
+from .hierarchy_manager import UnitHierarchyManager
 from .schema import CategoryInfo, PriceUpdate, ShopUnit, UnitHierarchy
+from .update_queries import UnitUpdate, UnitUpdateQuery, UnitUpdateType
 
 
 class ForbiddenOperation(RuntimeError):
     pass
 
 
-class UnitUpdateType(Enum):
-    ADD = 0
-    DELETE = 1
-    CHANGE = 2
-    REPLACE = 3
-
-
-class UnitUpdate:
-    def __init__(
-        self,
-        update_type: UnitUpdateType,
-        unit: Optional[ShopUnit] = None,
-        old_unit: Optional[ShopUnit] = None,
-        sumDiff: Optional[int] = None,
-        countDiff: Optional[int] = None,
-    ):
-        if update_type == UnitUpdateType.ADD:
-            self.sumDiff = unit.price
-            self.countDiff = 1
-        elif update_type == UnitUpdateType.DELETE:
-            self.sumDiff = -unit.price
-            self.countDiff = -1
-        elif update_type == UnitUpdateType.REPLACE:
-            self.sumDiff = unit.price - old_unit.price
-            self.countDiff = 0
-        else:
-            self.sumDiff = sumDiff
-            self.countDiff = countDiff
-
-
-class UnitUpdates(dict):
-    def __getitem__(self, key):
-        if key not in self:
-            super().__setitem__(key, list())
-        return super().__getitem__(key)
-
-
-class UpdateQuery:
-    def __init__(self):
-        self.date_updates = set()
-        self.unit_updates = UnitUpdates()
-
-    def __bool__(self):
-        return bool(self.date_updates) or bool(self.unit_updates)
-
-    def add_date_update(self, category_id: Optional[str]):
-        if category_id is None:
-            return
-        self.date_updates.add(category_id)
-
-    def add_price_update(self, category_id: Optional[str], update: UnitUpdate):
-        if category_id is None:
-            return
-        self.unit_updates[category_id].append(update)
-
-    def get_updating_ids(self):
-        return list(self.date_updates) + list(self.unit_updates.keys())
-
-    async def flush_date_updates(self, session, parents: Dict[str, List[str]], update_date: datetime):
-        all_parents = set([x for xs in [[key] + parents[key] for key in self.date_updates] for x in xs])
-        await session.execute(update(ShopUnit).where(ShopUnit.id.in_(all_parents)).values(last_update=update_date))
-
-    async def flush_price_updates(self, session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None):
-        all_parents = set([x for xs in [[key] + parents[key] for key in self.unit_updates.keys()] for x in xs])
-        totalSumDiff = {}
-        totalCountDiff = {}
-
-        for parent_id, updates in self.unit_updates.items():
-            current_parents = [parent_id] + parents[parent_id]
-
-            sumDiff = sum([e.sumDiff for e in updates])
-            countDiff = sum([e.countDiff for e in updates])
-
-            for parent in current_parents:
-                totalSumDiff[parent] = totalSumDiff.get(parent, 0) + sumDiff
-                totalCountDiff[parent] = totalCountDiff.get(parent, 0) + countDiff
-
-        if update_date is None:
-            update_dates = dict()
-            q = await session.execute(select(ShopUnit.id, ShopUnit.last_update).where(ShopUnit.id.in_(all_parents)))
-            for identifier, last_update in q.all():
-                update_dates[identifier] = last_update
-
-        for parent in all_parents:
-            q = await session.execute(
-                update(CategoryInfo)
-                .where(CategoryInfo.id == parent)
-                .values(sum=CategoryInfo.sum + totalSumDiff[parent], count=CategoryInfo.count + totalCountDiff[parent])
-                .returning(CategoryInfo.sum.label("sum"), CategoryInfo.count.label("count"))
-            )
-            info = q.one()
-            avg = info.sum / info.count if info.count else None
-
-            await session.execute(update(ShopUnit).where(ShopUnit.id == parent).values(price=avg))
-            await session.execute(
-                insert(PriceUpdate).values(
-                    unit_id=parent, price=avg, date=update_date if update_date is not None else update_dates[parent]
-                )
-            )
-
-    async def flush(self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None):
-        if update_date:
-            await self.flush_date_updates(session, parents, update_date)
-            await self.flush_price_updates(session, parents, update_date)
-        else:
-            await self.flush_price_updates(session, parents)
-
-
-class UnitHierarchyManager:
-    def __init__(self, session: Session):
-        self.session = session
-
-    async def delete(self, category: ShopUnit):
-        await self.session.execute(delete(UnitHierarchy).where(UnitHierarchy.id == category.id))
-
-    async def build(self, category: ShopUnit):
-        parent_id = category.parent_id
-        await self.session.execute(insert(UnitHierarchy).values(parent_id=category.parent_id, id=category.id))
-
-        while True:
-            q = await self.session.scalars(select(ShopUnit.parent_id).where(ShopUnit.id == parent_id))
-            parent_id = q.one_or_none()
-
-            if parent_id is None:
-                break
-
-            await self.session.execute(insert(UnitHierarchy).values(parent_id=parent_id, id=category.id))
-
-    async def rebuild(self, category):
-        await self.delete(category)
-        await self.build(category)
-
-
 class DAL:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session) -> DAL:
         self.session = session
-        self.updateQuery = UpdateQuery()
+        self.updateQuery = UnitUpdateQuery()
 
-    async def _get_category_info(self, category_id: str):
+    async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
             select(CategoryInfo.sum, CategoryInfo.count).where(CategoryInfo.id == category_id)
         )
         totalSum, childsCount = q.first()
         return (totalSum, childsCount)
 
-    async def delete_unit(self, id: str):
+    async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
+        unit.children = None
+        if unit.is_category:
+            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
+            unit.children = [await self._retrieve_unit(child) for child in q.all()]
+        return unit
+
+    def _get_statistics_query(self, *whereclause) -> Join:
+        return (
+            select(
+                ShopUnit.id,
+                ShopUnit.name,
+                ShopUnit.parent_id,
+                PriceUpdate.price,
+                ShopUnit.is_category,
+                PriceUpdate.date,
+            )
+            .select_from(ShopUnit)
+            .where(*whereclause)
+            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
+        )
+
+    async def delete_unit(self, id: str) -> None:
         q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
         unit = q.one()
-        query = UpdateQuery()
 
         if unit.parent_id:
+            query = UnitUpdateQuery()
             if unit.is_category:
-                totalSum, childsCount = await self._get_category_info(unit.id)
+                total_sum, childs_count = await self._get_category_info(unit.id)
                 query.add_price_update(
-                    unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sumDiff=-totalSum, countDiff=-childsCount)
+                    unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sum_diff=-total_sum, count_diff=-childs_count)
                 )
                 await UnitHierarchyManager(self.session).delete(unit)
             else:
                 query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, unit))
+            await query.flush(self.session, await self.get_parents_ids([unit.parent_id]))
 
-        await query.flush(self.session, await self.get_parents_ids([unit.parent_id]))
         await self.session.delete(unit)
 
     async def get_parents_ids(self, category_ids: List[str]) -> Dict[str, List[str]]:
@@ -190,7 +82,7 @@ class DAL:
 
         return result
 
-    def get_update_values(self, unit: ShopUnit):
+    def get_update_values(self, unit: ShopUnit) -> Dict:
         dict_repr = model_to_dict(unit)
         del dict_repr["id"]
 
@@ -199,7 +91,7 @@ class DAL:
         return dict_repr
 
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
-        update_query = UpdateQuery()
+        update_query = UnitUpdateQuery()
 
         for unit in units:
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
@@ -228,13 +120,15 @@ class DAL:
                         totalSum, childsCount = await self._get_category_info(unit.id)
                         update_query.add_price_update(
                             old_unit.parent_id,
-                            UnitUpdate(UnitUpdateType.CHANGE, sumDiff=-totalSum, countDiff=-childsCount),
+                            UnitUpdate(UnitUpdateType.CHANGE, sum_diff=-totalSum, count_diff=-childsCount),
                         )
                         update_query.add_price_update(
-                            unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sumDiff=totalSum, countDiff=childsCount)
+                            unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sum_diff=totalSum, count_diff=childsCount)
                         )
 
-                        await UnitHierarchyManager(self.session).build(unit)
+                        await UnitHierarchyManager(self.session).delete(old_unit)
+                        if unit.parent_id:
+                            await UnitHierarchyManager(self.session).build(unit)
                 else:
                     update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.REPLACE, unit, old_unit))
 
@@ -247,7 +141,7 @@ class DAL:
 
         return update_query
 
-    async def apply_updates(self, update_query, update_date):
+    async def apply_updates(self, update_query: UnitUpdateQuery, update_date: datetime) -> None:
         if update_query:
             parents = await self.get_parents_ids(update_query.get_updating_ids())
             await update_query.flush(self.session, parents, update_date)
@@ -259,27 +153,11 @@ class DAL:
         q.one()  # Исключение, если элемента не существует
 
         q = await self.session.execute(
-            select(
-                ShopUnit.id,
-                ShopUnit.name,
-                ShopUnit.parent_id,
-                PriceUpdate.price,
-                ShopUnit.is_category,
-                PriceUpdate.date,
+            self._get_statistics_query(
+                and_(ShopUnit.id == id, PriceUpdate.date >= date_start, PriceUpdate.date < date_end)
             )
-            .select_from(ShopUnit)
-            .where(ShopUnit.id == id)
-            .where(and_(PriceUpdate.date >= date_start, PriceUpdate.date < date_end))
-            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
         return q.all()
-
-    async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
-        unit.children = None
-        if unit.is_category:
-            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
-            unit.children = [await self._retrieve_unit(child) for child in q.all()]
-        return unit
 
     async def get_node(self, id: str) -> ShopUnit:
         q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
@@ -288,17 +166,12 @@ class DAL:
 
     async def get_sales(self, date: datetime) -> List[ShopUnit]:
         q = await self.session.execute(
-            select(
-                ShopUnit.id,
-                ShopUnit.name,
-                ShopUnit.parent_id,
-                PriceUpdate.price,
-                ShopUnit.is_category,
-                PriceUpdate.date,
+            self._get_statistics_query(
+                and_(
+                    ShopUnit.is_category == False,
+                    PriceUpdate.date >= date - timedelta(days=1),
+                    PriceUpdate.date <= date,
+                )
             )
-            .select_from(ShopUnit)
-            .where(ShopUnit.is_category == False)
-            .where(and_(PriceUpdate.date >= date - timedelta(days=1), PriceUpdate.date <= date))
-            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
         return q.all()

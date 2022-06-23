@@ -16,7 +16,9 @@ def add_exception_handling(app: FastAPI) -> None:
     @app.exception_handler(ValidationError)
     @app.exception_handler(RequestValidationError)
     @app.exception_handler(ForbiddenOperation)
-    async def validation_exception_handler(_: Request, _1: Union[RequestValidationError, ForbiddenOperation]):
+    async def validation_exception_handler(
+        _: Request, _1: Union[ValidationError, RequestValidationError, ForbiddenOperation]
+    ):
         return JSONResponse(status_code=400, content=jsonable_encoder(Error(code=400, message="Validation Failed")))
 
     @app.exception_handler(NoResultFound)

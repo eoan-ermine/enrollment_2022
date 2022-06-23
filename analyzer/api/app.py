@@ -44,7 +44,6 @@ async def delete_unit(id: UUID, session: Session = Depends(get_session)) -> Unio
 async def import_units(body: ShopUnitImportRequest, session: Session = Depends(get_session)) -> Union[None, Error]:
     last_update = body.updateDate
 
-    updates = []
     async with get_dal(session) as dal:
         updates = await dal.add_units(
             [schema.ShopUnit.from_model(item, last_update=last_update) for item in body.items], last_update
@@ -94,9 +93,9 @@ async def get_sales(date: datetime, session: Session = Depends(get_session)) -> 
     return ShopUnitStatisticResponse(items=[ShopUnitStatisticUnit.from_model(unit) for unit in units])
 
 
-def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False):
+def main(host: str = "127.0.0.1", port: int = 80, debug: bool = False) -> None:
     uvicorn.run("analyzer.api.app:app", host=host, port=port, reload=debug)
 
 
-def start():
+def start() -> None:
     typer.run(main)

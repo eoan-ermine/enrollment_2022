@@ -1,14 +1,11 @@
 import json
 import os
-import random
 import subprocess
-from datetime import datetime
-from typing import List, Optional, Tuple
-from uuid import uuid4
+from typing import List, Tuple
 
 from httpx import AsyncClient
 
-from analyzer.api.schema import ShopUnitImportRequest, ShopUnitType
+from analyzer.api.schema import ShopUnitImportRequest
 
 
 def deep_sort(node, key):
@@ -60,21 +57,6 @@ def compare_statistics(lhs, rhs):
     lhs["items"] = sorted(lhs["items"], key=lambda x: x["price"])
     rhs["items"] = sorted(rhs["items"], key=lambda x: x["price"])
     compare_result(lhs, rhs)
-
-
-def generate_batch(parent_id: Optional[int] = None, is_category: Optional[bool] = True):
-    return {
-        "items": [
-            {
-                "type": (ShopUnitType.CATEGORY if is_category else ShopUnitType.OFFER).value.upper(),
-                "id": str(uuid4()),
-                "name": str(uuid4()),
-                "parentId": parent_id,
-                "price": random.randint(100, 100000) if not is_category else None,
-            }
-        ],
-        "updateDate": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
 
 
 async def import_batches(client: AsyncClient, batches: List[ShopUnitImportRequest], expected_status: int):

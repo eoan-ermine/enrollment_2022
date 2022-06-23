@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 from pydantic.json import ENCODERS_BY_TYPE
+
+if TYPE_CHECKING:
+    from analyzer.db import schema
+
 
 # Format of datetimes in unit_tests
 ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%SZ")
@@ -45,14 +49,14 @@ class ShopUnit(BaseModel):
     )
 
     @staticmethod
-    def from_model(model: "analyzer.db.schema.ShopUnit"):
+    def from_model(model: schema.ShopUnit):
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
             date=model.last_update,
             parentId=UUID(model.parent_id) if model.parent_id else None,
             type=ShopUnitType.CATEGORY if model.is_category else ShopUnitType.OFFER,
-            price=None if not model.children and model.is_category else model.price,
+            price=model.price,
             children=[ShopUnit.from_model(child) for child in model.children] if model.is_category else None,
         )
 
@@ -110,7 +114,7 @@ class ShopUnitStatisticUnit(BaseModel):
     date: datetime = Field(..., description="Время последнего обновления элемента.")
 
     @staticmethod
-    def from_model(model):
+    def from_model(model: schema.ShopUnit):
         return ShopUnit(
             id=UUID(model.id),
             name=model.name,
