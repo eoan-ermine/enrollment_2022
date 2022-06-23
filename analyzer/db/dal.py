@@ -251,6 +251,11 @@ class DAL:
             await update_query.flush(self.session, parents, update_date)
 
     async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
+        # Проверка, что элемент существует. Отсутствие статистики не значит отсутствие элемента
+
+        q = await self.session.execute(select(ShopUnit.id).where(ShopUnit.id == id))
+        q.one()  # Исключение, если элемента не существует
+
         q = await self.session.execute(
             select(
                 ShopUnit.id,
