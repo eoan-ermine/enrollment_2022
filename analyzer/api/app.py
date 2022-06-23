@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Union
 from uuid import UUID
 
@@ -17,6 +17,7 @@ from .schema import (
     Error,
     ShopUnit,
     ShopUnitImportRequest,
+    ShopUnitStatisticRequest,
     ShopUnitStatisticResponse,
     ShopUnitStatisticUnit,
 )
@@ -61,10 +62,11 @@ async def import_units(body: ShopUnitImportRequest, session: Session = Depends(g
 )
 async def get_node_statistic(
     id: UUID,
-    date_start: Optional[datetime] = Query(default=datetime.min, alias="dateStart"),
-    date_end: Optional[datetime] = Query(default=datetime.max, alias="dateEnd"),
+    date_start: Optional[datetime] = Query(default=datetime.min.replace(tzinfo=timezone.utc), alias="dateStart"),
+    date_end: Optional[datetime] = Query(default=datetime.max.replace(tzinfo=timezone.utc), alias="dateEnd"),
     session=Depends(get_session),
 ) -> Union[ShopUnitStatisticResponse, Error]:
+    ShopUnitStatisticRequest(id=id, date_start=date_start, date_end=date_end)  # Validate date range
     async with get_dal(session) as dal:
         statistic_units = await dal.get_node_statistic(str(id), date_start, date_end)
     return ShopUnitStatisticResponse(items=[ShopUnitStatisticUnit.from_model(unit) for unit in statistic_units])
