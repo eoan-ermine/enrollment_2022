@@ -1,11 +1,14 @@
 import json
 import os
+import random
 import subprocess
-from typing import List
+from datetime import datetime
+from typing import List, Optional, Tuple
+from uuid import uuid4
 
 from httpx import AsyncClient
 
-from analyzer.api.schema import ShopUnitImportRequest
+from analyzer.api.schema import ShopUnitImportRequest, ShopUnitType
 
 
 def deep_sort(node, key):
@@ -59,9 +62,40 @@ def compare_statistics(lhs, rhs):
     compare_result(lhs, rhs)
 
 
+def generate_batch(parent_id: Optional[int] = None, is_category: Optional[bool] = True):
+    return {
+        "items": [
+            {
+                "type": (ShopUnitType.CATEGORY if is_category else ShopUnitType.OFFER).value.upper(),
+                "id": str(uuid4()),
+                "name": str(uuid4()),
+                "parentId": parent_id,
+                "price": random.randint(100, 100000) if not is_category else None,
+            }
+        ],
+        "updateDate": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
 async def import_batches(client: AsyncClient, batches: List[ShopUnitImportRequest], expected_status: int):
     for i, batch in enumerate(batches):
         response = await client.post("/imports", json=batch)
         assert (
             response.status_code == expected_status
         ), f"{i} BATCH FAILED, expected {expected_status} got {response.status_code}"
+
+
+def expected_statistics(info: List[Tuple[str, str, str, str, str, int]]):
+    return {
+        "items": [
+            {
+                "type": unit_type,
+                "name": name,
+                "id": unit_id,
+                "parentId": parent_id,
+                "date": date,
+                "price": price,
+            }
+            for unit_type, name, unit_id, parent_id, date, price in info
+        ]
+    }
