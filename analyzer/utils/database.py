@@ -29,8 +29,8 @@ def make_alembic_config(cmd_opts: Union[SimpleNamespace], base_path: str = PROJE
     alembic_location = config.get_main_option("script_location")
     if not os.path.isabs(alembic_location):
         config.set_main_option("script_location", os.path.join(base_path, alembic_location))
-    if cmd_opts.postgres_url:
-        config.set_main_option("sqlalchemy.url", cmd_opts.postgres_url)
+    if cmd_opts.pg_url:
+        config.set_main_option("sqlalchemy.url", cmd_opts.pg_url)
 
     return config
 

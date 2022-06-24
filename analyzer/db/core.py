@@ -1,11 +1,16 @@
+from os import getenv
+
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_PATH = "analyzer:root@localhost/analyzer"
-ASYNC_DATABASE_URL = f"postgresql+asyncpg://{DATABASE_PATH}"
-SYNC_DATABASE_URL = f"postgresql+psycopg2://{DATABASE_PATH}"
+DEFAULT_PG_PATH = "analyzer:root@localhost/analyzer"
+DEFAULT_PG_URL = f"postgresql://{DEFAULT_PG_PATH}"
+
+ANALYZER_PG_PATH = getenv("ANALYZER_PG_PATH", DEFAULT_PG_PATH)
+ASYNC_DATABASE_URL = f"postgresql+asyncpg://{ANALYZER_PG_PATH}"
+SYNC_DATABASE_URL = f"postgresql+psycopg2://{ANALYZER_PG_PATH}"
 
 engine = create_async_engine(ASYNC_DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession)

@@ -31,5 +31,5 @@ def alembic_config(postgres):
     Создает объект с конфигурацией для alembic, настроенный на временную БД.
     """
 
-    cmd_options = SimpleNamespace(config="alembic.ini", name="alembic", postgres_url=postgres, raiseerr=False, x=None)
+    cmd_options = SimpleNamespace(config="alembic.ini", name="alembic", pg_url=postgres, raiseerr=False, x=None)
     return make_alembic_config(cmd_options)
