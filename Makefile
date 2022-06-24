@@ -1,7 +1,9 @@
 PROJECT_NAME ?= enrollment_2022
 VERSION = $(shell poetry version -s)
 PROJECT_NAMESPACE ?= patriotrossii
-REGISTRY_IMAGE ?= $(PROJECT_NAMESPACE)/$(PROJECT_NAME)
+
+REGISTRY_NAME ?= ghcr.io
+REGISTRY_IMAGE ?= $(REGISTRY_NAME)/$(PROJECT_NAMESPACE)/$(PROJECT_NAME)
 
 all:
 	@echo "make devenv		- Create & setup development virtual environment"
@@ -40,7 +42,7 @@ sdist: clean
 	poetry build
 
 docker: sdist
-	docker build --target=api -t $(PROJECT_NAME):$(VERSION) .
+	docker build --target=final -t $(PROJECT_NAME):$(VERSION) .
 
 upload: docker
 	docker tag $(PROJECT_NAME):$(VERSION) $(REGISTRY_IMAGE):$(VERSION)
