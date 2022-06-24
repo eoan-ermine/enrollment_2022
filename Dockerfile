@@ -5,7 +5,7 @@ ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y gcc libffi-dev g++
-WORKDIR /app
+WORKDIR /analyzer
 
 FROM base as builder
 
@@ -26,7 +26,8 @@ RUN . /venv/bin/activate && poetry build
 FROM base as final
 
 COPY --from=builder /venv /venv
-COPY --from=builder /app/dist .
+COPY --from=builder /analyzer/dist .
+ENV PATH = "/venv/bin:$PATH"
 
 RUN . /venv/bin/activate && pip install *.whl
-CMD ["/venv/bin/start"]
+CMD ["analyzer-api"]

@@ -41,7 +41,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-start = "analyzer.api.app:start"
+analyzer-api = "analyzer.api.app:start"
 analyzer-db = "analyzer.db.__main__:main"
 
 [tool.pytest.ini_options]
