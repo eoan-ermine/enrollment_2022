@@ -51,8 +51,7 @@ jobs:
       - name: Test with pytest
         env:
           ANALYZER_PG_URL: postgresql://analyzer:root@postgres/analyzer
-        with:
-          args: wait-for-port postgres:5432 && poetry run pytest -vv
+        run: wait-for-port postgres:5432 && poetry run pytest -vv
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
@@ -64,8 +63,7 @@ jobs:
         run: make sdist
 
       - name: Retrieve version
-        run: |
-          echo "::set-output-name=PROJECT_VERSION::$(poetry version -s)"
+        run: echo "::set-output-name=PROJECT_VERSION::$(poetry version -s)"
         id: version
 
       - name: Build and push docker image
