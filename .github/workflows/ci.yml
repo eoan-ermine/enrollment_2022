@@ -51,7 +51,7 @@ jobs:
       - name: Test with pytest
         env:
           ANALYZER_PG_URL: postgresql://analyzer:root@postgres/analyzer
-        run: wait-for-port postgres:5432 && poetry run pytest -vv
+        run: poetry run pytest -vv
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
