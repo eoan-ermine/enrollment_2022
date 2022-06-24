@@ -16,6 +16,7 @@ def postgres():
     """
 
     tmp_name = uuid.uuid4().hex
+    print("postgres():", SYNC_DATABASE_URL)
     tmp_url = str(URL(SYNC_DATABASE_URL).with_path(tmp_name))
     create_database(tmp_url)
 

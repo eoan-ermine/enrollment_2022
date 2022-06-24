@@ -14,6 +14,8 @@ ANALYZER_PG_PATH = remove_prefix(ANALYZER_PG_URL, "postgresql://")
 ASYNC_DATABASE_URL = f"postgresql+asyncpg://{ANALYZER_PG_PATH}"
 SYNC_DATABASE_URL = f"postgresql+psycopg2://{ANALYZER_PG_PATH}"
 
+print(ANALYZER_PG_URL, ANALYZER_PG_PATH, ASYNC_DATABASE_URL, SYNC_DATABASE_URL)
+
 engine = create_async_engine(ASYNC_DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession)
 
