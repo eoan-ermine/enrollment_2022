@@ -5,10 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DEFAULT_PG_PATH = "analyzer:root@localhost/analyzer"
-DEFAULT_PG_URL = f"postgresql://{DEFAULT_PG_PATH}"
+from analyzer.utils.misc import remove_prefix
 
-ANALYZER_PG_PATH = getenv("ANALYZER_PG_PATH", DEFAULT_PG_PATH)
+DEFAULT_PG_URL = "postgresql://analyzer:root@localhost/analyzer"
+ANALYZER_PG_URL = getenv("ANALYZER_PG_URL", DEFAULT_PG_URL)
+ANALYZER_PG_PATH = remove_prefix(ANALYZER_PG_URL, "postgresql://")
+
 ASYNC_DATABASE_URL = f"postgresql+asyncpg://{ANALYZER_PG_PATH}"
 SYNC_DATABASE_URL = f"postgresql+psycopg2://{ANALYZER_PG_PATH}"
 
