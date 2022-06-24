@@ -1,6 +1,6 @@
 PROJECT_NAME ?= enrollment_2022
 VERSION = $(shell poetry version -s)
-PROJECT_NAMESPACE ?= eoanermine
+PROJECT_NAMESPACE ?= patriotrossii
 REGISTRY_IMAGE ?= $(PROJECT_NAMESPACE)/$(PROJECT_NAME)
 
 all:
