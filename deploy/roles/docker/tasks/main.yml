@@ -66,3 +66,9 @@
     name: docker
     state: started
     enabled: yes
+
+- name: Log into Github Packages registry
+  docker_login:
+    registry: "{{ registry }}"
+    username: "{{ registry_username }}"
+    password: "{{ registry_password }}"
