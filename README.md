@@ -1,31 +1,84 @@
-# Требования
+# Что внутри?
 
-* poetry (>= 1.0)
+Приложение упаковано в docker-контейнер и разворачивается с помощью [ansible](https://www.ansible.com/) ([инструкция по установке](https://www.ansible.com/)).
+Внутри docker-контейнера доступны две команды: `analyzer-db` — утилита для управления состоянием базы данных и `analyzer-api` — утилита для запуска REST API сервиса.
 
-## Установка зависимостей
+# Как использовать?
 
-### poetry
-```
-curl -sSL https://install.python-poetry.org | python3 -
-```
+## Как применить миграции
 
-# Запуск
-
-```
-poetry install
-poetry run start --host=0.0.0.0 --port=8080
+```bash
+docker run -it \
+    -e ANALYZER_PG_URL=postgresql://analyzer:root@localhost/analyzer \
+    patriotrossii/enrollment_2020 analyzer-db upgrade head
 ```
 
-# Тестирование
+## Как запустить REST API сервис локально на порту 80:
 
+```bash
+docker run -it -p 80:80 \
+    -e ANALYZER_PG_URL=postgresql://analyzer:root@localhost/analyzer \
+    patriotrossii/enrollment_2020
 ```
+
+Все доступные опции запуска любой команды можно получить с помощью аргумента `--help`:
+
+```bash
+docker run patriotrossii/enrollment_2020 analyzer-db --help
+docker run patriotrossii/enrollment_2020 analyzer-api --help
+```
+
+## Как развернуть?
+
+Чтобы развернуть и запустить сервис на серверах, добавьте список серверов (с установленной Ubuntu) в файл `deploy/hosts.ini` и выполните команды:
+
+``` bash
+cd deploy
+ansible-playbook -i hosts.ini --user=root deploy.yml
+```
+
+# Разработка
+
+Требования: установленный [python](https://python.org) (3.8+) и [poetry](https://python-poetry.org/) ([инструкция по установке](https://python-poetry.org/docs/))
+
+## Быстрые команды
+
+-   `make` — отобразить список доступных команд
+-   `make devenv` — создать и настроить виртуальное окружение для разработки
+-   `make postgres` — поднять Docker-контейнер с PostgreSQL
+-   `make format` — проверить на соответствие стандартам и отформатировать код с помощью `isort`, `black` и `flake8`
+-   `make clean` — удалить файлы, созданные модулем [distutils](https://docs.python.org/3/library/distutils.html)
+-   `make test` — запустить тесты
+-   `make sdist` — создать [source distribution](https://packaging.python.org/glossary/)
+-   `make docker` — собрать Docker-образ
+-   `make upload` — загрузить docker-образ на ghcr.io (требуется авторизация)
+
+## Как подготовить окружение для разработки?
+
+``` bash
+make devenv
+make postgres
+poetry run analyzer-db update head
+poetry run analyzer-api
+```
+
+После запуска команд приложение начнет слушать запросы на `127.0.0.1:80`.
+
+## Как запустить тесты локально?
+
+```bash
+make devenv
+make postgres
 poetry run pytest
 ```
 
-# Конфигурация среды разработки
+## Как запустить нагрузочное тестирование?
 
-Для поддержания единого стиля кода были созданы pre-commit хуки, которые устанавливаются следующим образом:
+Для запуска [locust](https://locust.io) необходимо выполнить следующие команды:
 
+```bash
+make devenv
+poetry run locust
 ```
-poetry run pre-commit install
-```
+
+После этого станет доступен веб-интерфейс по адресу <http://localhost:8089>
