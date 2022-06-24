@@ -83,4 +83,6 @@ jobs:
         with:
           push: true
           target: final
-          tags: ${{ steps.version.outputs.PROJECT_VERSION }}, latest
+          tags: |
+            ${{ steps.version.outputs.PROJECT_VERSION }}
+            latest
