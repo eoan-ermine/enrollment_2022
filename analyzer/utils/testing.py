@@ -1,7 +1,11 @@
 import json
 import os
+import random
+import string
 import subprocess
-from typing import Dict, List, Tuple
+from datetime import timedelta
+from typing import Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from httpx import AsyncClient, Response
 
@@ -95,3 +99,24 @@ def assert_nodes_response(response: Response, status_code: int, expected_result:
 def assert_statistics_response(response: Response, status_code: int, expected_result: Dict):
     assert_response(response, status_code)
     compare_statistics(response.json(), expected_result)
+
+
+def random_string(length: int):
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+def random_date(start, end):
+    delta = end - start
+    int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
+    random_second = random.randrange(int_delta)
+    return start + timedelta(seconds=random_second)
+
+
+def generate_shop_unit(is_category: bool, parent_id: Optional[str] = None) -> Dict:
+    return {
+        "type": "CATEGORY" if is_category else "OFFER",
+        "name": random_string(random.randint(5, 50)),
+        "id": str(uuid4()),
+        "parentId": parent_id if parent_id else None,
+        "price": random.randint(100, 1000000) if not is_category else None,
+    }
