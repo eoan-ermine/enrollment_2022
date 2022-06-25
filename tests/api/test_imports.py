@@ -157,6 +157,80 @@ EXPECTED_TREE = {
     ],
 }
 
+SMARTPHONES_ID = str(uuid4())
+STUFF_ID = str(uuid4())
+XIAOMI_ID = str(uuid4())
+XIAOMI_CONCRETE_ID = str(uuid4())
+
+
+ORDER_TEST_BATCHES = [
+    {
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Xiaomi Mi Band 5",
+                "id": XIAOMI_CONCRETE_ID,
+                "parentId": XIAOMI_ID,
+                "price": 10000,
+            },
+            {"type": "CATEGORY", "name": "Xiaomi", "id": XIAOMI_ID, "parentId": SMARTPHONES_ID},
+            {"type": "CATEGORY", "name": "Смартфоны", "id": SMARTPHONES_ID, "parentId": ROOT_ID},
+            {"type": "OFFER", "name": "Товар", "id": STUFF_ID, "parentId": ROOT_ID, "price": 5000},
+            {"type": "CATEGORY", "name": "Товары", "id": ROOT_ID, "parentId": None},
+        ],
+        "updateDate": "2022-02-01T12:00:00.000Z",
+    }
+]
+
+ORDER_TEST_EXPECTED_TREE = {
+    "type": "CATEGORY",
+    "name": "Товары",
+    "id": ROOT_ID,
+    "parentId": None,
+    "price": 7500,
+    "date": "2022-02-01T12:00:00.000Z",
+    "children": [
+        {
+            "type": "CATEGORY",
+            "name": "Смартфоны",
+            "id": SMARTPHONES_ID,
+            "parentId": ROOT_ID,
+            "price": 10000,
+            "date": "2022-02-01T12:00:00.000Z",
+            "children": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Xiaomi",
+                    "id": XIAOMI_ID,
+                    "parentId": SMARTPHONES_ID,
+                    "price": 10000,
+                    "date": "2022-02-01T12:00:00.000Z",
+                    "children": [
+                        {
+                            "type": "OFFER",
+                            "name": "Xiaomi Mi Band 5",
+                            "id": XIAOMI_CONCRETE_ID,
+                            "parentId": XIAOMI_ID,
+                            "price": 10000,
+                            "date": "2022-02-01T12:00:00.000Z",
+                            "children": None,
+                        }
+                    ],
+                }
+            ],
+        },
+        {
+            "type": "OFFER",
+            "name": "Товар",
+            "id": STUFF_ID,
+            "parentId": ROOT_ID,
+            "price": 5000,
+            "date": "2022-02-01T12:00:00.000Z",
+            "children": None,
+        },
+    ],
+}
+
 
 @pytest.mark.asyncio
 async def test_import(client):
@@ -533,16 +607,15 @@ async def test_import_change_parent_category(client):
 
 
 @pytest.mark.asyncio
-async def test_import_arbitrary_order(client):
+async def test_import_direct_order(client):
     batches = [
-        {
-            "items": [
-                {"type": "CATEGORY", "name": "Смартфоны", "id": str(uuid4()), "parentId": ROOT_ID},
-                {"type": "OFFER", "name": "Товар", "id": str(uuid4()), "parentId": ROOT_ID, "price": 5000},
-                {"type": "CATEGORY", "name": "Товары", "id": ROOT_ID, "parentId": None},
-            ],
-            "updateDate": "2022-02-01T12:00:00.000Z",
-        },
+        {"items": list(reversed(batch["items"])), "updateDate": batch["updateDate"]} for batch in ORDER_TEST_BATCHES
     ]
-
     await import_batches(client, batches, 200)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, ORDER_TEST_EXPECTED_TREE)
+
+
+@pytest.mark.asyncio
+async def test_import_reverse_order(client):
+    await import_batches(client, ORDER_TEST_BATCHES, 200)
+    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, ORDER_TEST_EXPECTED_TREE)
