@@ -2,41 +2,48 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum, auto
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
+from analyzer.db import schema
+from analyzer.db.schema import CategoryInfo, ShopUnit
 from analyzer.utils.misc import flatten
 
-from .schema import CategoryInfo, PriceUpdate, ShopUnit
+
+class PriceUpdates(dict):
+    def __getitem__(self, key: str) -> List[ShopUnit]:
+        if key not in self:
+            super().__setitem__(key, list())
+        return super().__getitem__(key)
 
 
-class UnitUpdateType(Enum):
+class PriceUpdateType(Enum):
     ADD = auto()
     DELETE = auto()
     CHANGE = auto()
     REPLACE = auto()
 
 
-class UnitUpdate:
+class PriceUpdate:
     def __init__(
         self,
-        update_type: UnitUpdateType,
+        update_type: PriceUpdateType,
         unit: Optional[ShopUnit] = None,
         old_unit: Optional[ShopUnit] = None,
         sum_diff: Optional[int] = None,
         count_diff: Optional[int] = None,
-    ) -> UnitUpdate:
-        if update_type == UnitUpdateType.ADD:
+    ) -> PriceUpdate:
+        if update_type == PriceUpdateType.ADD:
             self.sum_diff = unit.price
             self.count_diff = 1
-        elif update_type == UnitUpdateType.DELETE:
+        elif update_type == PriceUpdateType.DELETE:
             self.sum_diff = -unit.price
             self.count_diff = -1
-        elif update_type == UnitUpdateType.REPLACE:
+        elif update_type == PriceUpdateType.REPLACE:
             self.sum_diff = unit.price - old_unit.price
             self.count_diff = 0
         else:
@@ -47,34 +54,44 @@ class UnitUpdate:
         return f"{self.__class__}({self.sum_diff}, {self.count_diff})"
 
 
-class UnitUpdates(dict):
-    def __getitem__(self, key: str) -> List[ShopUnit]:
-        if key not in self:
-            super().__setitem__(key, list())
-        return super().__getitem__(key)
+class DateUpdate:
+    def __init__(self):
+        pass
 
 
 class UnitUpdateQuery:
     def __init__(self) -> UnitUpdateQuery:
         self.date_updates: Set[str] = set()
-        self.unit_updates: UnitUpdates = UnitUpdates()
+        self.unit_updates: PriceUpdates = PriceUpdates()
+
+    def add(self, category_id: str, update: Union[PriceUpdate, DateUpdate]):
+        if category_id is None:
+            return
+
+        if isinstance(update, PriceUpdate):
+            self.unit_updates[category_id].append(update)
+        else:
+            self.date_updates.add(category_id)
 
     def get_updating_ids(self) -> Set[str]:
         return set(list(self.date_updates) + list(self.unit_updates.keys()))
 
-    def add_date_update(self, category_id: Optional[str]) -> None:
-        if category_id is not None:
-            self.date_updates.add(category_id)
+    async def execute(
+        self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None
+    ) -> None:
+        if update_date:
+            await self._execute_date_updates(session, parents, update_date)
+            await self._execute_price_updates(session, parents, update_date)
+        else:
+            await self._execute_price_updates(session, parents)
 
-    def add_price_update(self, category_id: Optional[str], update: UnitUpdate) -> None:
-        if category_id is not None:
-            self.unit_updates[category_id].append(update)
-
-    async def flush_date_updates(self, session, parents: Dict[str, List[str]], update_date: datetime) -> None:
+    async def _execute_date_updates(
+        self, session: Session, parents: Dict[str, List[str]], update_date: datetime
+    ) -> None:
         all_parents = set(flatten([[key] + parents[key] for key in self.date_updates]))
         await session.execute(update(ShopUnit).where(ShopUnit.id.in_(all_parents)).values(last_update=update_date))
 
-    async def flush_price_updates(
+    async def _execute_price_updates(
         self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None
     ) -> None:
         all_parents_ids = set(flatten([[key] + parents[key] for key in self.unit_updates.keys()]))
@@ -110,19 +127,10 @@ class UnitUpdateQuery:
 
             await session.execute(update(ShopUnit).where(ShopUnit.id == parent_id).values(price=avg))
             await session.execute(
-                insert(PriceUpdate).values(
+                insert(schema.PriceUpdate).values(
                     unit_id=parent_id, price=avg, date=update_date if update_date is not None else update_dates[parent]
                 )
             )
-
-    async def flush(
-        self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None
-    ) -> None:
-        if update_date:
-            await self.flush_date_updates(session, parents, update_date)
-            await self.flush_price_updates(session, parents, update_date)
-        else:
-            await self.flush_price_updates(session, parents)
 
     def __bool__(self) -> bool:
         return bool(self.date_updates) or bool(self.unit_updates)
