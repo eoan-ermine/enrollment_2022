@@ -41,35 +41,6 @@ class DAL:
     def __init__(self, session: Session) -> DAL:
         self.session = session
 
-    async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
-        q = await self.session.execute(
-            select(CategoryInfo.sum, CategoryInfo.count).where(CategoryInfo.id == category_id)
-        )
-        totalSum, childsCount = q.first()
-        return (totalSum, childsCount)
-
-    async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
-        unit.children = None
-        if unit.is_category:
-            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
-            unit.children = [await self._retrieve_unit(child) for child in q.all()]
-        return unit
-
-    def _get_statistics_query(self, *whereclause) -> Join:
-        return (
-            select(
-                ShopUnit.id,
-                ShopUnit.name,
-                ShopUnit.parent_id,
-                PriceUpdate.price,
-                ShopUnit.is_category,
-                PriceUpdate.date,
-            )
-            .select_from(ShopUnit)
-            .where(*whereclause)
-            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
-        )
-
     async def delete_unit(self, id: str) -> None:
         unit_query = UnitUpdateQuery()
         hierarchy_query = HierarchyUpdateQuery()
@@ -200,3 +171,32 @@ class DAL:
             )
         )
         return q.all()
+
+    async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
+        q = await self.session.execute(
+            select(CategoryInfo.sum, CategoryInfo.count).where(CategoryInfo.id == category_id)
+        )
+        totalSum, childsCount = q.first()
+        return (totalSum, childsCount)
+
+    async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
+        unit.children = None
+        if unit.is_category:
+            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
+            unit.children = [await self._retrieve_unit(child) for child in q.all()]
+        return unit
+
+    def _get_statistics_query(self, *whereclause) -> Join:
+        return (
+            select(
+                ShopUnit.id,
+                ShopUnit.name,
+                ShopUnit.parent_id,
+                PriceUpdate.price,
+                ShopUnit.is_category,
+                PriceUpdate.date,
+            )
+            .select_from(ShopUnit)
+            .where(*whereclause)
+            .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
+        )
