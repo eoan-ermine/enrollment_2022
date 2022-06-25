@@ -62,19 +62,19 @@ class DateUpdate:
 class UnitUpdateQuery:
     def __init__(self) -> UnitUpdateQuery:
         self.date_updates: Set[str] = set()
-        self.unit_updates: PriceUpdates = PriceUpdates()
+        self.price_updates: PriceUpdates = PriceUpdates()
 
     def add(self, category_id: str, update: Union[PriceUpdate, DateUpdate]):
         if category_id is None:
             return
 
         if isinstance(update, PriceUpdate):
-            self.unit_updates[category_id].append(update)
+            self.price_updates[category_id].append(update)
         else:
             self.date_updates.add(category_id)
 
     def get_updating_ids(self) -> Set[str]:
-        return set(list(self.date_updates) + list(self.unit_updates.keys()))
+        return set(list(self.date_updates) + list(self.price_updates.keys()))
 
     async def execute(
         self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None
@@ -88,13 +88,19 @@ class UnitUpdateQuery:
     async def _execute_date_updates(
         self, session: Session, parents: Dict[str, List[str]], update_date: datetime
     ) -> None:
+        if not self.date_updates:
+            return
+
         all_parents = set(flatten([[key] + parents[key] for key in self.date_updates]))
         await session.execute(update(ShopUnit).where(ShopUnit.id.in_(all_parents)).values(last_update=update_date))
 
     async def _execute_price_updates(
         self, session: Session, parents: Dict[str, List[str]], update_date: Optional[datetime] = None
     ) -> None:
-        all_parents_ids = set(flatten([[key] + parents[key] for key in self.unit_updates.keys()]))
+        if not self.price_updates:
+            return
+
+        all_parents_ids = set(flatten([[key] + parents[key] for key in self.price_updates.keys()]))
         total_sum_diff = {}
         total_count_diff = {}
 
@@ -102,7 +108,7 @@ class UnitUpdateQuery:
             q = await session.execute(select(ShopUnit.id, ShopUnit.last_update).where(ShopUnit.id.in_(all_parents_ids)))
             update_dates = {identifier: last_update for identifier, last_update in q.all()}
 
-        for parent_id, updates in self.unit_updates.items():
+        for parent_id, updates in self.price_updates.items():
             current_parents = [parent_id] + parents[parent_id]
 
             sum_diff = sum([e.sum_diff for e in updates])
@@ -133,4 +139,4 @@ class UnitUpdateQuery:
             )
 
     def __bool__(self) -> bool:
-        return bool(self.date_updates) or bool(self.unit_updates)
+        return bool(self.date_updates) or bool(self.price_updates)

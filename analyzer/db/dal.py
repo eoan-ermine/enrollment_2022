@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, delete, update
 from sqlalchemy.future import select
@@ -11,9 +11,26 @@ from sqlalchemy.sql.expression import Join
 from analyzer.utils.misc import model_to_dict
 
 from . import queries
-from .hierarchy_manager import UnitHierarchyManager
+from .queries.hierarchy import (
+    HierarchyUpdate,
+    HierarchyUpdateQuery,
+    HierarchyUpdateType,
+)
 from .queries.unit import DateUpdate, PriceUpdateType, UnitUpdateQuery
 from .schema import CategoryInfo, PriceUpdate, ShopUnit, UnitHierarchy
+
+
+async def apply_updates(
+    session: Session,
+    update_query: UnitUpdateQuery,
+    hierarchy_query: HierarchyUpdateQuery,
+    update_date: Optional[datetime] = None,
+) -> None:
+    async with session.begin():
+        await hierarchy_query.execute(session)
+    async with session.begin():
+        parents = await DAL(session).get_parents_ids(update_query.get_updating_ids())
+        await update_query.execute(session, parents, update_date)
 
 
 class ForbiddenOperation(RuntimeError):
@@ -23,7 +40,6 @@ class ForbiddenOperation(RuntimeError):
 class DAL:
     def __init__(self, session: Session) -> DAL:
         self.session = session
-        self.updateQuery = UnitUpdateQuery()
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
@@ -55,29 +71,31 @@ class DAL:
         )
 
     async def delete_unit(self, id: str) -> None:
+        unit_query = UnitUpdateQuery()
+        hierarchy_query = HierarchyUpdateQuery()
+
         q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
         unit = q.one()
 
         if unit.parent_id:
-            query = UnitUpdateQuery()
             if unit.is_category:
                 total_sum, childs_count = await self._get_category_info(unit.id)
-                query.add(
+                unit_query.add(
                     unit.parent_id,
                     queries.unit.PriceUpdate(PriceUpdateType.CHANGE, sum_diff=-total_sum, count_diff=-childs_count),
                 )
             else:
-                query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.DELETE, unit))
-            await query.execute(self.session, await self.get_parents_ids([unit.parent_id]))
+                unit_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.DELETE, unit))
 
         if unit.is_category:
             q = await self.session.scalars(select(UnitHierarchy.id).where(UnitHierarchy.parent_id == id))
             child_categories = [unit.id] + q.all()
-
             await self.session.execute(delete(ShopUnit).where(ShopUnit.parent_id.in_(child_categories)))
-            await UnitHierarchyManager(self.session).delete(unit)
+
+            hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.DELETE, unit))
 
         await self.session.delete(unit)
+        return (unit_query, hierarchy_query)
 
     async def get_parents_ids(self, category_ids: List[str]) -> Dict[str, List[str]]:
         result = {category_id: [] for category_id in category_ids}
@@ -100,6 +118,7 @@ class DAL:
 
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         update_query = UnitUpdateQuery()
+        hierarchy_query = HierarchyUpdateQuery()
 
         for unit in units:
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
@@ -111,7 +130,7 @@ class DAL:
                 if unit.is_category:
                     self.session.add(CategoryInfo(id=unit.id, sum=0, count=0))
                     if unit.parent_id:
-                        await UnitHierarchyManager(self.session).build(unit)
+                        hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
                 else:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.ADD, unit))
             else:
@@ -137,9 +156,9 @@ class DAL:
                             queries.unit.PriceUpdate(PriceUpdateType.CHANGE, sum_diff=totalSum, count_diff=childsCount),
                         )
 
-                        await UnitHierarchyManager(self.session).delete(old_unit)
+                        hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.DELETE, old_unit))
                         if unit.parent_id:
-                            await UnitHierarchyManager(self.session).build(unit)
+                            hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
                 else:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit))
 
@@ -150,12 +169,7 @@ class DAL:
             if not unit.is_category:
                 self.session.add(PriceUpdate(unit_id=unit.id, price=unit.price, date=update_date))
 
-        return update_query
-
-    async def apply_updates(self, update_query: UnitUpdateQuery, update_date: datetime) -> None:
-        if update_query:
-            parents = await self.get_parents_ids(update_query.get_updating_ids())
-            await update_query.execute(self.session, parents, update_date)
+        return (update_query, hierarchy_query)
 
     async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
         # Проверка, что элемент существует. Отсутствие статистики не значит отсутствие элемента

@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Query
 from sqlalchemy.orm import Session
 
 from analyzer.db import schema
+from analyzer.db.dal import apply_updates
 from analyzer.utils.database import get_dal, get_session
 
 from .middleware import add_exception_handling
@@ -37,7 +38,8 @@ add_exception_handling(app)
 )
 async def delete_unit(id: UUID, session: Session = Depends(get_session)) -> Union[None, Error]:
     async with get_dal(session) as dal:
-        await dal.delete_unit(str(id))
+        unit_updates, hierarchy_updates = await dal.delete_unit(str(id))
+    await apply_updates(session, unit_updates, hierarchy_updates)
 
 
 @app.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
@@ -45,13 +47,12 @@ async def import_units(body: ShopUnitImportRequest, session: Session = Depends(g
     last_update = body.updateDate
 
     async with get_dal(session) as dal:
-        updates = await dal.add_units(
+        unit_updates, hierarchy_updates = await dal.add_units(
             [schema.ShopUnit.from_model(item, last_update=last_update) for item in body.items], last_update
         )
 
-    # Апдейты должны выполняться после строго после создания всех юнитов и иерархии
-    async with get_dal(session) as dal:
-        await dal.apply_updates(updates, last_update)
+    # Апдейты должны выполняться после строго после создания всех юнитов
+    await apply_updates(session, unit_updates, hierarchy_updates, last_update)
 
 
 @app.get(
