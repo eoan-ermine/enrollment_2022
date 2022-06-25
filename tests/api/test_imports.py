@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from analyzer.utils.testing import assert_nodes_response, import_batches
@@ -528,3 +530,19 @@ async def test_import_change_parent_category(client):
     await import_batches(client, batches, 200)
 
     assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
+
+
+@pytest.mark.asyncio
+async def test_import_arbitrary_order(client):
+    batches = [
+        {
+            "items": [
+                {"type": "CATEGORY", "name": "Смартфоны", "id": str(uuid4()), "parentId": ROOT_ID},
+                {"type": "OFFER", "name": "Товар", "id": str(uuid4()), "parentId": ROOT_ID, "price": 5000},
+                {"type": "CATEGORY", "name": "Товары", "id": ROOT_ID, "parentId": None},
+            ],
+            "updateDate": "2022-02-01T12:00:00.000Z",
+        },
+    ]
+
+    await import_batches(client, batches, 200)
