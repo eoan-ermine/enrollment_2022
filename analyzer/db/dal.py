@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 
-from sqlalchemy import and_, update
+from sqlalchemy import and_, delete, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
@@ -64,10 +64,16 @@ class DAL:
                 query.add_price_update(
                     unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sum_diff=-total_sum, count_diff=-childs_count)
                 )
-                await UnitHierarchyManager(self.session).delete(unit)
             else:
                 query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, unit))
             await query.flush(self.session, await self.get_parents_ids([unit.parent_id]))
+
+        if unit.is_category:
+            q = await self.session.scalars(select(UnitHierarchy.id).where(UnitHierarchy.parent_id == id))
+            child_categories = [unit.id] + q.all()
+
+            await self.session.execute(delete(ShopUnit).where(ShopUnit.parent_id.in_(child_categories)))
+            await UnitHierarchyManager(self.session).delete(unit)
 
         await self.session.delete(unit)
 

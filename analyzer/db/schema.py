@@ -12,9 +12,7 @@ class ShopUnit(Base):
 
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
-
-    parent_id = Column(String, ForeignKey("shop_units.id", ondelete="CASCADE"), index=True)
-    parent = relationship(lambda: ShopUnit, remote_side=id, backref=backref("shop_units", passive_deletes=True))
+    parent_id = Column(String, index=True)
 
     price = Column(Integer)
     is_category = Column(Boolean)
