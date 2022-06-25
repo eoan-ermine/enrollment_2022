@@ -18,7 +18,7 @@ async def test_nodes_category(client):
         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
         "price": None,
         "parentId": None,
-        "date": "2022-02-01T12:00:00Z",
+        "date": "2022-02-01T12:00:00.000Z",
         "children": [],
     }
 
@@ -41,7 +41,7 @@ async def test_nodes_offer(client):
                     "price": 69999,
                 }
             ],
-            "updateDate": "2022-02-02T12:00:00Z",
+            "updateDate": "2022-02-02T12:00:00.000Z",
         }
     ]
     expected_tree = {
@@ -49,7 +49,7 @@ async def test_nodes_offer(client):
         "name": 'Goldstar 65" LED UHD LOL Very Smart',
         "id": item_id,
         "parentId": None,
-        "date": "2022-02-02T12:00:00Z",
+        "date": "2022-02-02T12:00:00.000Z",
         "price": 69999,
         "children": None,
     }

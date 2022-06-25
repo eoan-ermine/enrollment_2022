@@ -13,7 +13,7 @@ IMPORT_BATCHES = [
                 "parentId": None,
             }
         ],
-        "updateDate": "2022-02-01T12:00:00Z",
+        "updateDate": "2022-02-01T12:00:00.000Z",
     },
     {
         "items": [
@@ -38,7 +38,7 @@ IMPORT_BATCHES = [
                 "price": 59999,
             },
         ],
-        "updateDate": "2022-02-02T12:00:00Z",
+        "updateDate": "2022-02-02T12:00:00.000Z",
     },
     {
         "items": [
@@ -63,7 +63,7 @@ IMPORT_BATCHES = [
                 "price": 49999,
             },
         ],
-        "updateDate": "2022-02-03T12:00:00Z",
+        "updateDate": "2022-02-03T12:00:00.000Z",
     },
     {
         "items": [
@@ -75,7 +75,7 @@ IMPORT_BATCHES = [
                 "price": 69999,
             }
         ],
-        "updateDate": "2022-02-03T15:00:00Z",
+        "updateDate": "2022-02-03T15:00:00.000Z",
     },
 ]
 
@@ -85,7 +85,7 @@ EXPECTED_TREE = {
     "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
     "price": 58599,
     "parentId": None,
-    "date": "2022-02-03T15:00:00Z",
+    "date": "2022-02-03T15:00:00.000Z",
     "children": [
         {
             "type": "CATEGORY",
@@ -93,7 +93,7 @@ EXPECTED_TREE = {
             "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
             "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
             "price": 50999,
-            "date": "2022-02-03T15:00:00Z",
+            "date": "2022-02-03T15:00:00.000Z",
             "children": [
                 {
                     "type": "OFFER",
@@ -101,7 +101,7 @@ EXPECTED_TREE = {
                     "id": "98883e8f-0507-482f-bce2-2fb306cf6483",
                     "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
                     "price": 32999,
-                    "date": "2022-02-03T12:00:00Z",
+                    "date": "2022-02-03T12:00:00.000Z",
                     "children": None,
                 },
                 {
@@ -110,7 +110,7 @@ EXPECTED_TREE = {
                     "id": "74b81fda-9cdc-4b63-8927-c978afed5cf4",
                     "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
                     "price": 49999,
-                    "date": "2022-02-03T12:00:00Z",
+                    "date": "2022-02-03T12:00:00.000Z",
                     "children": None,
                 },
                 {
@@ -119,7 +119,7 @@ EXPECTED_TREE = {
                     "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
                     "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
                     "price": 69999,
-                    "date": "2022-02-03T15:00:00Z",
+                    "date": "2022-02-03T15:00:00.000Z",
                     "children": None,
                 },
             ],
@@ -130,7 +130,7 @@ EXPECTED_TREE = {
             "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
             "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
             "price": 69999,
-            "date": "2022-02-02T12:00:00Z",
+            "date": "2022-02-02T12:00:00.000Z",
             "children": [
                 {
                     "type": "OFFER",
@@ -138,7 +138,7 @@ EXPECTED_TREE = {
                     "id": "863e1a7a-1304-42ae-943b-179184c077e3",
                     "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                     "price": 79999,
-                    "date": "2022-02-02T12:00:00Z",
+                    "date": "2022-02-02T12:00:00.000Z",
                     "children": None,
                 },
                 {
@@ -147,7 +147,7 @@ EXPECTED_TREE = {
                     "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
                     "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                     "price": 59999,
-                    "date": "2022-02-02T12:00:00Z",
+                    "date": "2022-02-02T12:00:00.000Z",
                     "children": None,
                 },
             ],
@@ -171,7 +171,7 @@ async def test_import_update(client):
         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
         "price": 37499,
         "parentId": None,
-        "date": "2022-02-02T13:00:00Z",
+        "date": "2022-02-02T13:00:00.000Z",
         "children": [
             {
                 "type": "CATEGORY",
@@ -179,7 +179,7 @@ async def test_import_update(client):
                 "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                 "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
                 "price": 37499,
-                "date": "2022-02-02T13:00:00Z",
+                "date": "2022-02-02T13:00:00.000Z",
                 "children": [
                     {
                         "type": "OFFER",
@@ -187,7 +187,7 @@ async def test_import_update(client):
                         "id": "863e1a7a-1304-42ae-943b-179184c077e3",
                         "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                         "price": 15000,
-                        "date": "2022-02-02T13:00:00Z",
+                        "date": "2022-02-02T13:00:00.000Z",
                         "children": None,
                     },
                     {
@@ -196,7 +196,7 @@ async def test_import_update(client):
                         "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
                         "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                         "price": 59999,
-                        "date": "2022-02-02T12:00:00Z",
+                        "date": "2022-02-02T12:00:00.000Z",
                         "children": None,
                     },
                 ],
@@ -218,7 +218,7 @@ async def test_import_update(client):
                         "price": 15000,
                     }
                 ],
-                "updateDate": "2022-02-02T13:00:00Z",
+                "updateDate": "2022-02-02T13:00:00.000Z",
             }
         ],
         200,
@@ -246,7 +246,7 @@ async def test_import_type_change(client):
                     "price": 1000,
                 },
             ],
-            "updateDate": "2022-02-01T12:00:00Z",
+            "updateDate": "2022-02-01T12:00:00.000Z",
         },
     ]
     expected_tree = {
@@ -255,7 +255,7 @@ async def test_import_type_change(client):
         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
         "price": 1000,
         "parentId": None,
-        "date": "2022-02-01T12:00:00Z",
+        "date": "2022-02-01T12:00:00.000Z",
         "children": [
             {
                 "type": "OFFER",
@@ -263,7 +263,7 @@ async def test_import_type_change(client):
                 "id": "863e1a7a-1304-42ae-943b-179184c077e3",
                 "price": 1000,
                 "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "date": "2022-02-01T12:00:00Z",
+                "date": "2022-02-01T12:00:00.000Z",
                 "children": None,
             }
         ],
@@ -289,7 +289,7 @@ async def test_import_type_change(client):
                         "parentId": None,
                     },
                 ],
-                "updateDate": "2022-02-01T12:00:00Z",
+                "updateDate": "2022-02-01T12:00:00.000Z",
             }
         ],
         400,
@@ -307,7 +307,7 @@ async def test_import_type_change(client):
                         "price": None,
                     }
                 ],
-                "updateDate": "2022-02-01T12:00:00Z",
+                "updateDate": "2022-02-01T12:00:00.000Z",
             }
         ],
         400,
@@ -331,7 +331,7 @@ async def test_import_category_price(client):
                     "price": 1000,
                 }
             ],
-            "updateDate": "2022-02-01T12:00:00Z",
+            "updateDate": "2022-02-01T12:00:00.000Z",
         }
     ]
     await import_batches(client, batches, 400)
@@ -339,7 +339,7 @@ async def test_import_category_price(client):
 
 @pytest.mark.asyncio
 async def test_import_empty(client):
-    await import_batches(client, [{"items": [], "updateDate": "2022-02-01T12:00:00Z"}], 200)
+    await import_batches(client, [{"items": [], "updateDate": "2022-02-01T12:00:00.000Z"}], 200)
 
 
 @pytest.mark.asyncio
@@ -370,7 +370,7 @@ async def test_import_change_parent(client):
                     "parentId": None,
                 },
             ],
-            "updateDate": "2022-02-01T12:00:00Z",
+            "updateDate": "2022-02-01T12:00:00.000Z",
         },
         {
             "items": [
@@ -382,7 +382,7 @@ async def test_import_change_parent(client):
                     "price": 49000,
                 }
             ],
-            "updateDate": "2022-02-01T15:00:00Z",
+            "updateDate": "2022-02-01T15:00:00.000Z",
         },
         {
             "items": [
@@ -394,7 +394,7 @@ async def test_import_change_parent(client):
                     "price": 49000,
                 }
             ],
-            "updateDate": "2022-02-01T16:00:00Z",
+            "updateDate": "2022-02-01T16:00:00.000Z",
         },
     ]
 
@@ -404,7 +404,7 @@ async def test_import_change_parent(client):
         "id": goods_root_id,
         "price": 25000,
         "parentId": None,
-        "date": "2022-02-01T16:00:00Z",
+        "date": "2022-02-01T16:00:00.000Z",
         "children": [
             {
                 "type": "OFFER",
@@ -412,7 +412,7 @@ async def test_import_change_parent(client):
                 "id": "863e1a7a-1304-42ae-943b-179184c077e3",
                 "price": 1000,
                 "parentId": goods_root_id,
-                "date": "2022-02-01T12:00:00Z",
+                "date": "2022-02-01T12:00:00.000Z",
                 "children": None,
             },
             {
@@ -421,7 +421,7 @@ async def test_import_change_parent(client):
                 "id": "863e1a7a-1304-42ae-943b-179184c077e4",
                 "price": 49000,
                 "parentId": goods_root_id,
-                "date": "2022-02-01T16:00:00Z",
+                "date": "2022-02-01T16:00:00.000Z",
                 "children": None,
             },
         ],
@@ -433,7 +433,7 @@ async def test_import_change_parent(client):
         "id": people_root_id,
         "price": None,
         "parentId": None,
-        "date": "2022-02-01T16:00:00Z",
+        "date": "2022-02-01T16:00:00.000Z",
         "children": [],
     }
 
@@ -465,7 +465,7 @@ async def test_import_change_parent_category(client):
                     "price": 1000,
                 },
             ],
-            "updateDate": "2022-02-01T12:00:00Z",
+            "updateDate": "2022-02-01T12:00:00.000Z",
         },
         {
             "items": [
@@ -478,11 +478,11 @@ async def test_import_change_parent_category(client):
                     "price": 2000,
                 },
             ],
-            "updateDate": "2022-02-01T13:00:00Z",
+            "updateDate": "2022-02-01T13:00:00.000Z",
         },
         {
             "items": [{"type": "CATEGORY", "name": "Люди", "id": people_root_id, "parentId": goods_root_id}],
-            "updateDate": "2022-02-01T15:00:00Z",
+            "updateDate": "2022-02-01T15:00:00.000Z",
         },
     ]
 
@@ -492,7 +492,7 @@ async def test_import_change_parent_category(client):
         "id": goods_root_id,
         "price": 1500,
         "parentId": None,
-        "date": "2022-02-01T15:00:00Z",
+        "date": "2022-02-01T15:00:00.000Z",
         "children": [
             {
                 "type": "OFFER",
@@ -500,7 +500,7 @@ async def test_import_change_parent_category(client):
                 "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
                 "price": 1000,
                 "parentId": goods_root_id,
-                "date": "2022-02-01T12:00:00Z",
+                "date": "2022-02-01T12:00:00.000Z",
                 "children": None,
             },
             {
@@ -509,7 +509,7 @@ async def test_import_change_parent_category(client):
                 "id": people_root_id,
                 "price": 2000,
                 "parentId": goods_root_id,
-                "date": "2022-02-01T15:00:00Z",
+                "date": "2022-02-01T15:00:00.000Z",
                 "children": [
                     {
                         "type": "OFFER",
@@ -517,7 +517,7 @@ async def test_import_change_parent_category(client):
                         "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
                         "price": 2000,
                         "parentId": people_root_id,
-                        "date": "2022-02-01T13:00:00Z",
+                        "date": "2022-02-01T13:00:00.000Z",
                         "children": None,
                     }
                 ],

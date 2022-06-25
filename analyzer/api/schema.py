@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 # Format of datetimes in unit_tests
-ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%SZ")
+ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%S.000Z")
 
 
 class ShopUnitType(Enum):

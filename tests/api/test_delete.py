@@ -26,7 +26,7 @@ async def test_delete_category_item(client):
         "name": "Телевизоры",
         "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
         "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-        "date": "2022-02-03T15:00:00Z",
+        "date": "2022-02-03T15:00:00.000Z",
         "price": 41499,
         "children": [
             {
@@ -34,7 +34,7 @@ async def test_delete_category_item(client):
                 "name": 'Samson 70" LED UHD Smart',
                 "id": "98883e8f-0507-482f-bce2-2fb306cf6483",
                 "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "date": "2022-02-03T12:00:00Z",
+                "date": "2022-02-03T12:00:00.000Z",
                 "price": 32999,
                 "children": None,
             },
@@ -43,7 +43,7 @@ async def test_delete_category_item(client):
                 "name": 'Phyllis 50" LED UHD Smarter',
                 "id": "74b81fda-9cdc-4b63-8927-c978afed5cf4",
                 "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "date": "2022-02-03T12:00:00Z",
+                "date": "2022-02-03T12:00:00.000Z",
                 "price": 49999,
                 "children": None,
             },
@@ -71,7 +71,7 @@ async def test_delete_category(client):
         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
         "price": 69999,
         "parentId": None,
-        "date": "2022-02-03T15:00:00Z",
+        "date": "2022-02-03T15:00:00.000Z",
         "children": [
             {
                 "type": "CATEGORY",
@@ -79,7 +79,7 @@ async def test_delete_category(client):
                 "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                 "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
                 "price": 69999,
-                "date": "2022-02-02T12:00:00Z",
+                "date": "2022-02-02T12:00:00.000Z",
                 "children": [
                     {
                         "type": "OFFER",
@@ -87,7 +87,7 @@ async def test_delete_category(client):
                         "id": "863e1a7a-1304-42ae-943b-179184c077e3",
                         "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                         "price": 79999,
-                        "date": "2022-02-02T12:00:00Z",
+                        "date": "2022-02-02T12:00:00.000Z",
                         "children": None,
                     },
                     {
@@ -96,7 +96,7 @@ async def test_delete_category(client):
                         "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
                         "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
                         "price": 59999,
-                        "date": "2022-02-02T12:00:00Z",
+                        "date": "2022-02-02T12:00:00.000Z",
                         "children": None,
                     },
                 ],
@@ -118,4 +118,6 @@ async def test_delete_history(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
     assert_response(await client.delete(f"/delete/{ROOT_ID}"), 200)
-    assert_statistics_response(await client.get("/sales", params={"date": "2022-02-03T15:00:00Z"}), 200, {"items": []})
+    assert_statistics_response(
+        await client.get("/sales", params={"date": "2022-02-03T15:00:00.000Z"}), 200, {"items": []}
+    )
