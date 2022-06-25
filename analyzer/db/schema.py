@@ -1,6 +1,7 @@
-from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Column, ForeignKey, Index
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.types import TIMESTAMP, Boolean, Integer, String
+from sqlalchemy_utils import LtreeType
 
 from analyzer.api import schema
 
@@ -13,11 +14,12 @@ class ShopUnit(Base):
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
     parent_id = Column(String, index=True)
-
     price = Column(Integer)
     is_category = Column(Boolean)
-
     last_update = Column(type_=TIMESTAMP(timezone=True))
+
+    path = Column(LtreeType, nullable=False)
+    __table_args__ = (Index("ix_shop_units_path", path, postgresql_using="gist"),)
 
     @staticmethod
     def from_model(model: schema.ShopUnit, last_update: int):
