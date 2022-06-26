@@ -30,8 +30,9 @@ class HierarchyUpdate:
     async def _build(self, session: Session) -> None:
         ident, parent_id = self.unit_id, self.parent_id
         batch_inserter = BatchInserter()
-
         batch_inserter.add(UnitHierarchy, {"parent_id": parent_id, "id": ident})
+
+        # Итеративно получаем всех родителей категории с unit_id == ident
         while True:
             q = await session.scalars(select(ShopUnit.parent_id).where(ShopUnit.id == parent_id))
             parent_id = q.one_or_none()

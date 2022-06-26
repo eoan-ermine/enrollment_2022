@@ -44,6 +44,8 @@ class PriceUpdate(Base):
 
 
 class UnitHierarchy(Base):
+    """Модель, хранящая служебную информацию об иерархии категорий"""
+
     __tablename__ = "units_hierarchy"
 
     parent_id = Column(String, primary_key=True, index=True, nullable=False)

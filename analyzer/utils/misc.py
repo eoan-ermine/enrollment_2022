@@ -15,5 +15,6 @@ def remove_prefix(text, prefix):
     return text
 
 
+# Класс-обертка, устраняющий необходимость в изменении кода, опирающегося на обращение к аттрибутам
 class nameddict(dict):
     __getattr__ = dict.__getitem__

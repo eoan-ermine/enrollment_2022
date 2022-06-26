@@ -5,9 +5,8 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-path = os.path.dirname(__file__)
 
-
+# Функция, устраняющая необходимость в ручном импорте функций всех эндпоинтов
 def import_all_in_dir(path, pkg=__package__):
     for entry in os.scandir(path):
         if entry.is_dir():
@@ -24,4 +23,4 @@ def import_all_in_dir(path, pkg=__package__):
             import_module(f".{name}", package=pkg)
 
 
-import_all_in_dir(path)
+import_all_in_dir(os.path.dirname(__file__))
