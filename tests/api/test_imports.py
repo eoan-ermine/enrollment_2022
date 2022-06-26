@@ -619,3 +619,98 @@ async def test_import_direct_order(client):
 async def test_import_reverse_order(client):
     await import_batches(client, ORDER_TEST_BATCHES, 200)
     assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, ORDER_TEST_EXPECTED_TREE)
+
+
+@pytest.mark.asyncio
+async def test_import_different_updates(client):
+    goods_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+    people_root_id = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df2"
+
+    batches = [
+        {
+            "items": [
+                {
+                    "type": "CATEGORY",
+                    "name": "Товары",
+                    "id": goods_root_id,
+                    "parentId": None,
+                },
+                {
+                    "type": "OFFER",
+                    "name": "Апельсин",
+                    "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                    "parentId": goods_root_id,
+                    "price": 1000,
+                },
+            ],
+            "updateDate": "2022-02-01T12:00:00.000Z",
+        },
+        {
+            "items": [
+                {"type": "CATEGORY", "name": "Люди", "id": people_root_id, "parentId": None},
+                {
+                    "type": "OFFER",
+                    "name": "Иван",
+                    "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                    "parentId": people_root_id,
+                    "price": 2000,
+                },
+            ],
+            "updateDate": "2022-02-01T13:00:00.000Z",
+        },
+        {
+            "items": [
+                {
+                    "type": "OFFER",
+                    "name": "Андрей",
+                    "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                    "parentId": people_root_id,
+                    "price": 5000,
+                },
+                {"type": "CATEGORY", "name": "Люди", "id": people_root_id, "parentId": goods_root_id},
+            ],
+            "updateDate": "2022-02-01T15:00:00.000Z",
+        },
+    ]
+
+    expected_goods_tree = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": goods_root_id,
+        "price": 3000,
+        "parentId": None,
+        "date": "2022-02-01T15:00:00.000Z",
+        "children": [
+            {
+                "type": "OFFER",
+                "name": "Апельсин",
+                "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 1000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T12:00:00.000Z",
+                "children": None,
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Люди",
+                "id": people_root_id,
+                "price": 5000,
+                "parentId": goods_root_id,
+                "date": "2022-02-01T15:00:00.000Z",
+                "children": [
+                    {
+                        "type": "OFFER",
+                        "name": "Андрей",
+                        "id": "169cb8d7-bbdd-47d3-ad8f-82ef4c269df2",
+                        "price": 5000,
+                        "parentId": people_root_id,
+                        "date": "2022-02-01T15:00:00.000Z",
+                        "children": None,
+                    }
+                ],
+            },
+        ],
+    }
+
+    await import_batches(client, batches, 200)
+    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
