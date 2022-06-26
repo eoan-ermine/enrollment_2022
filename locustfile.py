@@ -29,20 +29,21 @@ class ImportUser(HttpUser, RequestMixin):
         self.current_date = self.current_date + timedelta(days=1)
 
     def on_start(self):
-        root_unit = generate_shop_unit(is_category=True)
+        if getattr(self, "category_ids", None) is None:
+            root_unit = generate_shop_unit(is_category=True)
 
-        parent_id, categories = root_unit["id"], [root_unit]
-        for _ in range(CATEGORY_DEPTH_LIMIT - 1):
-            category = generate_shop_unit(is_category=True, parent_id=parent_id)
-            categories.append(category)
-            parent_id = category["id"]
+            parent_id, categories = root_unit["id"], [root_unit]
+            for _ in range(CATEGORY_DEPTH_LIMIT - 1):
+                category = generate_shop_unit(is_category=True, parent_id=parent_id)
+                categories.append(category)
+                parent_id = category["id"]
 
-        self.current_date = random_date(datetime(year=2000, month=1, day=1), datetime(year=3000, month=1, day=1))
-        self.category_ids = [category["id"] for category in categories]
+            self.current_date = random_date(datetime(year=2000, month=1, day=1), datetime(year=3000, month=1, day=1))
+            self.category_ids = [category["id"] for category in categories]
 
-        self.request(
-            "POST", "/imports", 200, json={"items": categories, "updateDate": DATETIME_ENCODER(self.current_date)}
-        )
+            self.request(
+                "POST", "/imports", 200, json={"items": categories, "updateDate": DATETIME_ENCODER(self.current_date)}
+            )
 
 
 class HierarchyStressUser(HttpUser, RequestMixin):
