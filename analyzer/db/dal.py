@@ -8,8 +8,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
 
-from analyzer.utils.misc import model_to_dict
-
 from . import queries
 from .queries.hierarchy import (
     HierarchyUpdate,
@@ -79,7 +77,7 @@ class DAL:
 
         return result
 
-    async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
+    async def add_units(self, units: List, update_date: datetime) -> None:
         update_query = UnitUpdateQuery()
         hierarchy_query = HierarchyUpdateQuery()
 
@@ -88,13 +86,12 @@ class DAL:
         new_price_updates = []
 
         for unit in units:
-            dict_representation = model_to_dict(unit)
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
             old_unit = q.one_or_none()
 
             update_query.add(unit.parent_id, DateUpdate())
             if old_unit is None:
-                new_units.append(dict_representation)
+                new_units.append(unit)
                 if unit.is_category:
                     new_category_infos.append({"id": unit.id, "sum": 0, "count": 0})
                     if unit.parent_id:
@@ -131,9 +128,7 @@ class DAL:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit))
 
                 await self.session.execute(
-                    update(ShopUnit)
-                    .where(ShopUnit.id == unit.id)
-                    .values(**self._get_update_values(dict_representation))
+                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self._get_update_values(unit, update_date))
                 )
 
             if not unit.is_category:
@@ -182,11 +177,11 @@ class DAL:
         )
         return q.all()
 
-    def _get_update_values(self, unit_row: Dict) -> Dict:
-        update_values = dict(unit_row)
-        if unit_row["is_category"]:
-            del update_values["price"]
-        return update_values
+    def _get_update_values(self, unit, last_update) -> Dict:
+        if unit.is_category:
+            return {"name": unit.name, "parent_id": unit.parent_id, "last_update": last_update}
+        else:
+            return {"name": unit.name, "parent_id": unit.parent_id, "price": unit.price, "last_update": last_update}
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
