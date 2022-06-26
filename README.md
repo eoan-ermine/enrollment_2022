@@ -10,7 +10,7 @@
 ```bash
 docker run -it \
     -e ANALYZER_PG_URL=postgresql://analyzer:root@localhost/analyzer \
-    patriotrossii/enrollment_2020 analyzer-db upgrade head
+    patriotrossii/enrollment_2022 analyzer-db upgrade head
 ```
 
 ## Как запустить REST API сервис локально на порту 80:
@@ -18,14 +18,14 @@ docker run -it \
 ```bash
 docker run -it -p 80:80 \
     -e ANALYZER_PG_URL=postgresql://analyzer:root@localhost/analyzer \
-    patriotrossii/enrollment_2020
+    patriotrossii/enrollment_2022
 ```
 
 Все доступные опции запуска любой команды можно получить с помощью аргумента `--help`:
 
 ```bash
-docker run patriotrossii/enrollment_2020 analyzer-db --help
-docker run patriotrossii/enrollment_2020 analyzer-api --help
+docker run patriotrossii/enrollment_2022 analyzer-db --help
+docker run patriotrossii/enrollment_2022 analyzer-api --help
 ```
 
 ## Как развернуть?
