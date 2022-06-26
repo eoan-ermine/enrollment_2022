@@ -79,14 +79,6 @@ class DAL:
 
         return result
 
-    def get_update_values(self, unit: ShopUnit) -> Dict:
-        dict_repr = model_to_dict(unit)
-        del dict_repr["id"]
-
-        if unit.is_category:
-            del dict_repr["price"]
-        return dict_repr
-
     async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
         update_query = UnitUpdateQuery()
         hierarchy_query = HierarchyUpdateQuery()
@@ -134,7 +126,7 @@ class DAL:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit))
 
                 await self.session.execute(
-                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self.get_update_values(unit))
+                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self._get_update_values(unit))
                 )
 
             if not unit.is_category:
@@ -171,6 +163,14 @@ class DAL:
             )
         )
         return q.all()
+
+    def _get_update_values(self, unit: ShopUnit) -> Dict:
+        dict_repr = model_to_dict(unit)
+        del dict_repr["id"]
+
+        if unit.is_category:
+            del dict_repr["price"]
+        return dict_repr
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
