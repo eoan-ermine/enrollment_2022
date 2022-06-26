@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from analyzer.utils.testing import assert_nodes_response, import_batches
+from analyzer.utils.testing import assert_nodes, import_batches
 
 ROOT_ID = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
 IMPORT_BATCHES = [
@@ -236,7 +236,7 @@ ORDER_TEST_EXPECTED_TREE = {
 async def test_import(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, EXPECTED_TREE)
+    await assert_nodes(client, ROOT_ID, 200, EXPECTED_TREE)
 
 
 @pytest.mark.asyncio
@@ -300,7 +300,7 @@ async def test_import_update(client):
         200,
     )
 
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
+    await assert_nodes(client, ROOT_ID, 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -391,7 +391,7 @@ async def test_import_type_change(client):
 
     # Проверка, что структура осталась прежней
 
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
+    await assert_nodes(client, ROOT_ID, 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -515,8 +515,8 @@ async def test_import_change_parent(client):
 
     await import_batches(client, batches, 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
-    assert_nodes_response(await client.get(f"/nodes/{people_root_id}"), 200, expected_people_tree)
+    await assert_nodes(client, goods_root_id, 200, expected_goods_tree)
+    await assert_nodes(client, people_root_id, 200, expected_people_tree)
 
 
 @pytest.mark.asyncio
@@ -603,7 +603,7 @@ async def test_import_change_parent_category(client):
 
     await import_batches(client, batches, 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
+    await assert_nodes(client, goods_root_id, 200, expected_goods_tree)
 
 
 @pytest.mark.asyncio
@@ -612,13 +612,13 @@ async def test_import_direct_order(client):
         {"items": list(reversed(batch["items"])), "updateDate": batch["updateDate"]} for batch in ORDER_TEST_BATCHES
     ]
     await import_batches(client, batches, 200)
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, ORDER_TEST_EXPECTED_TREE)
+    await assert_nodes(client, ROOT_ID, 200, ORDER_TEST_EXPECTED_TREE)
 
 
 @pytest.mark.asyncio
 async def test_import_reverse_order(client):
     await import_batches(client, ORDER_TEST_BATCHES, 200)
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, ORDER_TEST_EXPECTED_TREE)
+    await assert_nodes(client, ROOT_ID, 200, ORDER_TEST_EXPECTED_TREE)
 
 
 @pytest.mark.asyncio
@@ -713,4 +713,4 @@ async def test_import_different_updates(client):
     }
 
     await import_batches(client, batches, 200)
-    assert_nodes_response(await client.get(f"/nodes/{goods_root_id}"), 200, expected_goods_tree)
+    await assert_nodes(client, goods_root_id, 200, expected_goods_tree)

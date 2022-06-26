@@ -1,9 +1,9 @@
 import pytest
 
 from analyzer.utils.testing import (
-    assert_nodes_response,
+    assert_nodes,
     assert_response,
-    assert_statistics_response,
+    assert_sales,
     import_batches,
 )
 from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
@@ -53,7 +53,7 @@ async def test_delete_category_item(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
     assert_response(await client.delete(f"/delete/{item_id}"), 200)
-    assert_nodes_response(await client.get(f"/nodes/{category_id}"), 200, expected_tree)
+    await assert_nodes(client, category_id, 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_delete_category(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
     assert_response(await client.delete(f"/delete/{category_id}"), 200)
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
+    await assert_nodes(client, ROOT_ID, 200, expected_tree)
 
     for item_id in items_ids:
         assert_response(await client.get(f"/nodes/{item_id}"), 404)
@@ -118,6 +118,4 @@ async def test_delete_history(client):
     await import_batches(client, IMPORT_BATCHES, 200)
 
     assert_response(await client.delete(f"/delete/{ROOT_ID}"), 200)
-    assert_statistics_response(
-        await client.get("/sales", params={"date": "2022-02-03T15:00:00.000Z"}), 200, {"items": []}
-    )
+    await assert_sales(client, 200, {"items": []}, params={"date": "2022-02-03T15:00:00.000Z"})

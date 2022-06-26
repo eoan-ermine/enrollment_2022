@@ -91,7 +91,8 @@ def assert_response(response: Response, status_code: int):
     assert response.status_code == status_code
 
 
-def assert_nodes_response(response: Response, status_code: int, expected_result: Dict):
+async def assert_nodes(client: AsyncClient, node_id: str, status_code: int, expected_result: Dict):
+    response = await client.get(f"/nodes/{node_id}")
     assert_response(response, status_code)
     compare_nodes(response.json(), expected_result)
 
@@ -99,6 +100,18 @@ def assert_nodes_response(response: Response, status_code: int, expected_result:
 def assert_statistics_response(response: Response, status_code: int, expected_result: Dict):
     assert_response(response, status_code)
     compare_statistics(response.json(), expected_result)
+
+
+async def assert_statistics(
+    client: AsyncClient, node_id: str, status_code: int, expected_result: Dict, *args, **kwargs
+):
+    response = await client.get(f"/node/{node_id}/statistic", *args, **kwargs)
+    assert_statistics_response(response, status_code, expected_result)
+
+
+async def assert_sales(client, status_code: int, expected_result: Dict, *args, **kwargs):
+    response = await client.get("/sales", *args, **kwargs)
+    assert_statistics_response(response, status_code, expected_result)
 
 
 def random_string(length: int):

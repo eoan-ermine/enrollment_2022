@@ -1,10 +1,6 @@
 import pytest
 
-from analyzer.utils.testing import (
-    assert_response,
-    assert_statistics_response,
-    import_batches,
-)
+from analyzer.utils.testing import assert_response, assert_sales, import_batches
 from tests.api.test_imports import IMPORT_BATCHES
 
 
@@ -61,12 +57,8 @@ async def test_sales_corner_dates(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    assert_statistics_response(
-        await client.get("/sales", params={"date": "2022-02-03T15:00:00.000Z"}), 200, expected_tree_end_corner
-    )
-    assert_statistics_response(
-        await client.get("/sales", params={"date": "2022-02-04T15:00:00.000Z"}), 200, expected_tree_begin_corner
-    )
+    await assert_sales(client, 200, expected_tree_end_corner, params={"date": "2022-02-03T15:00:00.000Z"})
+    await assert_sales(client, 200, expected_tree_begin_corner, params={"date": "2022-02-04T15:00:00.000Z"})
 
 
 @pytest.mark.asyncio
@@ -110,9 +102,7 @@ async def test_sales_update(client):
     await import_batches(client, IMPORT_BATCHES, 200)
     await import_batches(client, batches, 200)
 
-    assert_statistics_response(
-        await client.get("/sales", params={"date": "2022-02-04T15:00:00.000Z"}), 200, expected_tree
-    )
+    await assert_sales(client, 200, expected_tree, params={"date": "2022-02-04T15:00:00.000Z"})
 
 
 @pytest.mark.asyncio
@@ -129,6 +119,4 @@ async def test_sales_delete(client):
     await import_batches(client, batches, 200)
 
     assert_response(await client.delete(f"/delete/{unit_id}"), 200)
-    assert_statistics_response(
-        await client.get("/sales", params={"date": "2022-02-04T15:00:00.000Z"}), 200, expected_tree
-    )
+    await assert_sales(client, 200, expected_tree, params={"date": "2022-02-04T15:00:00.000Z"})

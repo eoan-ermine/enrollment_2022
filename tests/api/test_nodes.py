@@ -2,11 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from analyzer.utils.testing import (
-    assert_nodes_response,
-    assert_response,
-    import_batches,
-)
+from analyzer.utils.testing import assert_nodes, assert_response, import_batches
 from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
 
 
@@ -24,7 +20,7 @@ async def test_nodes_category(client):
 
     await import_batches(client, IMPORT_BATCHES[:1], 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
+    await assert_nodes(client, ROOT_ID, 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -56,7 +52,7 @@ async def test_nodes_offer(client):
 
     await import_batches(client, batches, 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{item_id}"), 200, expected_tree)
+    await assert_nodes(client, item_id, 200, expected_tree)
 
 
 @pytest.mark.asyncio
