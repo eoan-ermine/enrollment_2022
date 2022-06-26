@@ -30,7 +30,7 @@ async def get_node_statistic(
     date_end: Optional[datetime] = Query(default=datetime.max.replace(tzinfo=timezone.utc), alias="dateEnd"),
     session: Session = Depends(get_session),
 ) -> Union[ShopUnitStatisticResponse, Error]:
-    ShopUnitStatisticRequest(id=id, date_start=date_start, date_end=date_end)  # Validate date range
+    ShopUnitStatisticRequest(id=id, date_start=date_start, date_end=date_end)  # Валидация дат
     async with get_dal(session) as dal:
         statistic_units = await dal.get_node_statistic(str(id), date_start, date_end)
     return ShopUnitStatisticResponse(items=[ShopUnitStatisticUnit.from_model(unit) for unit in statistic_units])

@@ -46,10 +46,12 @@ class BatchInserter:
         self.values = dict()
 
     def add(self, model, values):
+        # Накапливаем создания определенных моделей
         if model not in self.values:
             self.values[model] = []
         self.values[model].append(values)
 
     async def execute(self, session: Session):
+        # Для каждой модели осуществляем вставку всех новых объектов
         for model, values in self.values.items():
             await session.execute(insert(model).values(values))

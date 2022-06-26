@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from analyzer.db import schema
 
 
-# Format of datetimes in unit_tests
+# Поправляем форматирование дат на форматирование, требуемое спецификацией
 ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%S.000Z")
 
 
@@ -152,6 +152,8 @@ class ShopUnitStatisticRequest(BaseModel):
     @validator("date_end")
     def validate_range(cls, value, values, **kwargs):
         # date_start точно прошло валидацию, т.к. изначально прошло валидацию в обработчике эндпоинта
+        # date_start не должно быть больше или равно date_end, так как интервал определен как [date_start; date_end)
+
         if values["date_start"] >= value:
             raise ValueError(
                 f"{values['date_start']} and {value} must define valid half-opened interval [date_start; date_end)"
