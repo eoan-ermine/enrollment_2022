@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, delete, insert, update
+from sqlalchemy import and_, bindparam, delete, insert, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
@@ -85,6 +85,9 @@ class DAL:
         new_category_infos = []
         new_price_updates = []
 
+        unit_updates = []
+        category_updates = []
+
         for unit in units:
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
             old_unit = q.one_or_none()
@@ -127,9 +130,11 @@ class DAL:
                 else:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit))
 
-                await self.session.execute(
-                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self._get_update_values(unit, update_date))
-                )
+                update_values = dict(id_=unit.id, **self._get_update_values(unit, update_date))
+                if unit.is_category:
+                    category_updates.append(update_values)
+                else:
+                    unit_updates.append(update_values)
 
             if not unit.is_category:
                 new_price_updates.append({"unit_id": unit.id, "price": unit.price, "date": update_date})
@@ -141,6 +146,12 @@ class DAL:
             await self.session.execute(insert(CategoryInfo).values(new_category_infos))
         if new_price_updates:
             await self.session.execute(insert(PriceUpdate).values(new_price_updates))
+
+        update_stmt = update(ShopUnit).where(ShopUnit.id == bindparam("id_"))
+        if unit_updates:
+            await self.session.execute(update_stmt.values(self._get_update_params(is_category=False)), unit_updates)
+        if category_updates:
+            await self.session.execute(update_stmt.values(self._get_update_params(is_category=True)), category_updates)
 
         return (update_query, hierarchy_query)
 
@@ -182,6 +193,21 @@ class DAL:
             return {"name": unit.name, "parent_id": unit.parent_id, "last_update": last_update}
         else:
             return {"name": unit.name, "parent_id": unit.parent_id, "price": unit.price, "last_update": last_update}
+
+    def _get_update_params(self, is_category) -> Dict:
+        if is_category:
+            return {
+                "name": bindparam("name"),
+                "parent_id": bindparam("parent_id"),
+                "last_update": bindparam("last_update"),
+            }
+        else:
+            return {
+                "name": bindparam("name"),
+                "parent_id": bindparam("parent_id"),
+                "price": bindparam("price"),
+                "last_update": bindparam("last_update"),
+            }
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(

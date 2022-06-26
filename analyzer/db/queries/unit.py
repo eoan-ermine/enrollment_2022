@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum, auto
 from typing import Dict, List, Optional, Set, Union
 
-from sqlalchemy import update
+from sqlalchemy import bindparam, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
@@ -105,6 +105,7 @@ class UnitUpdateQuery:
         total_count_diff = {}
 
         price_updates = []
+        avg_updates = []
 
         if update_date is None:
             q = await session.execute(select(ShopUnit.id, ShopUnit.last_update).where(ShopUnit.id.in_(all_parents_ids)))
@@ -133,7 +134,7 @@ class UnitUpdateQuery:
             info = q.one()
             avg = info.sum / info.count if info.count else None
 
-            await session.execute(update(ShopUnit).where(ShopUnit.id == parent_id).values(price=avg))
+            avg_updates.append({"id_": parent_id, "price": avg})
             price_updates.append(
                 {
                     "unit_id": parent_id,
@@ -143,6 +144,9 @@ class UnitUpdateQuery:
             )
 
         await session.execute(insert(schema.PriceUpdate).values(price_updates))
+        await session.execute(
+            update(ShopUnit).where(ShopUnit.id == bindparam("id_")).values({"price": bindparam("price")}), avg_updates
+        )
 
     def __bool__(self) -> bool:
         return bool(self.date_updates) or bool(self.price_updates)
