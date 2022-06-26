@@ -5,7 +5,6 @@ from enum import Enum, auto
 from typing import Dict, List, Optional, Set, Union
 
 from sqlalchemy import bindparam, func, update
-from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
 from analyzer.db import schema
@@ -117,11 +116,6 @@ class UnitUpdateQuery:
         batch_inserter = BatchInserter()
         avg_updates = []
 
-        if update_date is None:
-            # Если update_date не указан — необходимо в PriceUpdate в поле date указать актуальный last_update юнита
-            q = await session.execute(select(ShopUnit.id, ShopUnit.last_update).where(ShopUnit.id.in_(all_parents_ids)))
-            update_dates = {identifier: last_update for identifier, last_update in q.all()}
-
         for parent_id, updates in self.price_updates.items():
             # Нам необходимо обновить также саму категорию, не только ее родителей
             current_parents = [parent_id] + parents[parent_id]
@@ -134,27 +128,28 @@ class UnitUpdateQuery:
                 total_sum_diff[parent] = total_sum_diff.get(parent, 0) + sum_diff
                 total_count_diff[parent] = total_count_diff.get(parent, 0) + count_diff
 
+        update_values = {}
+        if update_date:
+            update_values["last_update"] = update_date
+
         for parent_id in all_parents_ids:
-            q = await session.scalars(
+            update_values.update(
+                {
+                    "sum": CategoryInfo.sum + total_sum_diff[parent_id],
+                    "count": CategoryInfo.count + total_count_diff[parent_id],
+                }
+            )
+
+            q = await session.execute(
                 update(CategoryInfo)
                 .where(CategoryInfo.id == parent_id)
-                .values(
-                    sum=CategoryInfo.sum + total_sum_diff[parent_id],
-                    count=CategoryInfo.count + total_count_diff[parent_id],
-                )
-                .returning(CategoryInfo.sum / func.nullif(CategoryInfo.count, 0))
+                .values(**update_values)
+                .returning(CategoryInfo.sum / func.nullif(CategoryInfo.count, 0), CategoryInfo.last_update)
             )
-            avg = q.one()  # Деление на NULL возвратит NULL — желаемое значение, если детей нет
+            avg, last_update = q.first()  # Деление на NULL возвратит NULL — желаемое значение, если детей нет
 
             avg_updates.append({"id_": parent_id, "price": avg})
-            batch_inserter.add(
-                schema.PriceUpdate,
-                {
-                    "unit_id": parent_id,
-                    "price": avg,
-                    "date": update_date if update_date is not None else update_dates[parent],
-                },
-            )
+            batch_inserter.add(schema.PriceUpdate, {"unit_id": parent_id, "price": avg, "date": last_update})
 
         # Выполняем все insert и update запросы одним batch (для каждого типа запроса)
         await batch_inserter.execute(session)
