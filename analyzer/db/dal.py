@@ -104,9 +104,11 @@ class DAL:
         unit_updates = []
         category_updates = []
 
+        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id.in_([unit.id for unit in units])))
+        database_units = {unit.id: unit for unit in q.all()}
+
         for unit in units:
-            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
-            old_unit = q.one_or_none()
+            old_unit = database_units.get(unit.id, None)
 
             update_query.add(unit.parent_id, DateUpdate())
             if old_unit is None:

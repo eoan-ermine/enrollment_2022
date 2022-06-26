@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generator, List, Union
+from typing import List, Union
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -14,9 +14,8 @@ from analyzer.utils.misc import nameddict
 from . import router
 
 
-def make_units_table_rows(units: List[ShopUnitImport], last_update: datetime) -> Generator:
-    for unit in units:
-        yield nameddict(unit.to_database_row(last_update))
+def make_units_table_rows(units: List[ShopUnitImport], last_update: datetime):
+    return [nameddict(unit.to_database_row(last_update)) for unit in units]
 
 
 @router.post("/imports", response_model=None, status_code=200, responses={"400": {"model": Error}})
