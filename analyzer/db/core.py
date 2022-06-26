@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from analyzer.utils.misc import remove_prefix
 
 DEFAULT_PG_URL = "postgresql://analyzer:root@localhost/analyzer"
+
 ANALYZER_PG_URL = getenv("ANALYZER_PG_URL", DEFAULT_PG_URL)
 ANALYZER_PG_PATH = remove_prefix(ANALYZER_PG_URL, "postgresql://")
 

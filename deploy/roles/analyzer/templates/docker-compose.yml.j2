@@ -2,7 +2,7 @@ version: "3.4"
 services:
   postgres:
     restart: always
-    image: postgres:12
+    image: postgres:14
     environment:
       POSTGRES_USER: {{ analyzer_pg_user }}
       POSTGRES_PASSWORD: {{ analyzer_pg_password }}

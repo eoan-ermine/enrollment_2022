@@ -7,7 +7,7 @@ from pydantic.json import ENCODERS_BY_TYPE
 
 from analyzer.utils.testing import (
     assert_response,
-    assert_statistics_response,
+    assert_statistics,
     expected_statistics,
     import_batches,
 )
@@ -21,7 +21,7 @@ async def test_stats(client):
     assert_response(
         await client.get(
             f"/node/{ROOT_ID}/statistic",
-            params={"dateStart": "2022-02-01T00:00:00Z", "dateEnd": "2022-02-03T00:00:00Z"},
+            params={"dateStart": "2022-02-01T00:00:00.000Z", "dateEnd": "2022-02-03T00:00:00.000Z"},
         ),
         200,
     )
@@ -37,7 +37,7 @@ async def test_stats_corner_dates(client):
                 "name": 'Goldstar 65" LED UHD LOL Very Smart',
                 "id": node_id,
                 "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "date": "2022-02-03T15:00:00Z",
+                "date": "2022-02-03T15:00:00.000Z",
                 "price": 69999,
             }
         ]
@@ -45,31 +45,28 @@ async def test_stats_corner_dates(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    assert_statistics_response(
-        await client.get(
-            f"/node/{node_id}/statistic",
-            params={"dateStart": "2022-02-03T15:00:00Z", "dateEnd": "2022-02-03T16:00:00Z"},
-        ),
+    await assert_statistics(
+        client,
+        node_id,
         200,
         expected_tree,
+        params={"dateStart": "2022-02-03T15:00:00.000Z", "dateEnd": "2022-02-03T16:00:00.000Z"},
     )
 
-    assert_statistics_response(
-        await client.get(
-            f"/node/{node_id}/statistic",
-            params={"dateStart": "2022-02-03T14:00:00Z", "dateEnd": "2022-02-03T15:00:00Z"},
-        ),
+    await assert_statistics(
+        client,
+        node_id,
         200,
         {"items": []},
+        params={"dateStart": "2022-02-03T14:00:00.000Z", "dateEnd": "2022-02-03T15:00:00.000Z"},
     )
 
-    assert_statistics_response(
-        await client.get(
-            f"/node/{node_id}/statistic",
-            params={"dateStart": "2022-02-03T14:00:00Z", "dateEnd": "2022-02-03T15:00:01Z"},
-        ),
+    await assert_statistics(
+        client,
+        node_id,
         200,
         expected_tree,
+        params={"dateStart": "2022-02-03T14:00:00.000Z", "dateEnd": "2022-02-03T15:00:01Z"},
     )
 
 
@@ -131,23 +128,24 @@ async def tests_stats_omit_borders(client):
 
     await import_batches(client, batches, 200)
 
-    assert_statistics_response(
-        await client.get(f"/node/{node_id}/statistic", params={"dateEnd": "2022-02-03T15:00:00Z"}),
+    await assert_statistics(
+        client,
+        node_id,
         200,
         expected_unit_statistics([(datetime_min, 1000)]),
+        params={"dateEnd": "2022-02-03T15:00:00.000Z"},
     )
 
-    assert_statistics_response(
-        await client.get(f"/node/{node_id}/statistic", params={"dateStart": "2022-02-03T15:00:00Z"}),
+    await assert_statistics(
+        client,
+        node_id,
         200,
         expected_unit_statistics([(datetime_max, 100000)]),
+        params={"dateStart": "2022-02-03T15:00:00.000Z"},
     )
 
-    assert_statistics_response(
-        await client.get(f"/node/{node_id}/statistic"),
-        200,
-        expected_unit_statistics([(datetime_min, 1000), (datetime_max, 100000)]),
-    )
+    expected = expected_unit_statistics([(datetime_min, 1000), (datetime_max, 100000)])
+    await assert_statistics(client, node_id, 200, expected)
 
 
 @pytest.mark.asyncio
@@ -157,7 +155,7 @@ async def test_stats_incorrect_date(client):
     assert_response(
         await client.get(
             f"/node/{ROOT_ID}/statistic",
-            params={"dateStart": "2022-02-03T15:00:00Z", "dateEnd": "2022-02-03T15:00:00Z"},
+            params={"dateStart": "2022-02-03T15:00:00.000Z", "dateEnd": "2022-02-03T15:00:00.000Z"},
         ),
         400,
     )
@@ -165,7 +163,7 @@ async def test_stats_incorrect_date(client):
     assert_response(
         await client.get(
             f"/node/{ROOT_ID}/statistic",
-            params={"dateStart": "2022-02-03T16:00:00Z", "dateEnd": "2022-02-03T15:00:00Z"},
+            params={"dateStart": "2022-02-03T16:00:00.000Z", "dateEnd": "2022-02-03T15:00:00.000Z"},
         ),
         400,
     )
@@ -233,13 +231,15 @@ async def tests_stats_categories(client):
 
     await import_batches(client, IMPORT_BATCHES, 200)
 
-    expected_response = expected_smartphones_statistics([("2022-02-02T12:00:00Z", 69999)])
-    assert_statistics_response(await client.get(f"/node/{SMARTPHONES_ID}/statistic"), 200, expected_response)
+    expected_response = expected_smartphones_statistics([("2022-02-02T12:00:00.000Z", 69999)])
+    await assert_statistics(client, SMARTPHONES_ID, 200, expected_response)
 
-    expected_response = expected_tvs_statistics([("2022-02-03T12:00:00Z", 41499), ("2022-02-03T15:00:00Z", 50999)])
-    assert_statistics_response(await client.get(f"/node/{TVS_ID}/statistic"), 200, expected_response)
+    expected_response = expected_tvs_statistics(
+        [("2022-02-03T12:00:00.000Z", 41499), ("2022-02-03T15:00:00.000Z", 50999)]
+    )
+    await assert_statistics(client, TVS_ID, 200, expected_response)
 
     expected_response = expected_goods_statistics(
-        [("2022-02-02T12:00:00Z", 69999), ("2022-02-03T12:00:00Z", 55749), ("2022-02-03T15:00:00Z", 58599)]
+        [("2022-02-02T12:00:00.000Z", 69999), ("2022-02-03T12:00:00.000Z", 55749), ("2022-02-03T15:00:00.000Z", 58599)]
     )
-    assert_statistics_response(await client.get(f"/node/{ROOT_ID}/statistic"), 200, expected_response)
+    await assert_statistics(client, ROOT_ID, 200, expected_response)

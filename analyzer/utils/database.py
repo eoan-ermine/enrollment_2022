@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import os
-from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Union
 
 from alembic.config import Config
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
 from analyzer.db.core import SessionLocal
-from analyzer.db.dal import DAL
 
 PROJECT_PATH = Path(__file__).parent.parent.resolve()
 
@@ -40,11 +41,17 @@ async def get_session() -> Session:
         yield session
 
 
-@asynccontextmanager
-async def get_dal(session: Session) -> DAL:
-    client = DAL(session)
-    try:
-        await session.begin()
-        yield client
-    finally:
-        await session.commit()
+class BatchInserter:
+    def __init__(self):
+        self.values = dict()
+
+    def add(self, model, values):
+        # Накапливаем создания определенных моделей
+        if model not in self.values:
+            self.values[model] = []
+        self.values[model].append(values)
+
+    async def execute(self, session: Session):
+        # Для каждой модели осуществляем вставку всех новых объектов
+        for model, values in self.values.items():
+            await session.execute(insert(model).values(values))

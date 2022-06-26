@@ -33,7 +33,7 @@ postgres:
 		--env POSTGRES_USER=analyzer \
 		--env POSTGRES_PASSWORD=root \
 		--env POSTGRES_DB=analyzer \
-		--publish 5432:5432 postgres
+		--publish 5432:5432 postgres:14
 
 test: postgres
 	poetry run pytest

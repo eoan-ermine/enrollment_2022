@@ -2,11 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from analyzer.utils.testing import (
-    assert_nodes_response,
-    assert_response,
-    import_batches,
-)
+from analyzer.utils.testing import assert_nodes, assert_response, import_batches
 from tests.api.test_imports import IMPORT_BATCHES, ROOT_ID
 
 
@@ -18,13 +14,13 @@ async def test_nodes_category(client):
         "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
         "price": None,
         "parentId": None,
-        "date": "2022-02-01T12:00:00Z",
+        "date": "2022-02-01T12:00:00.000Z",
         "children": [],
     }
 
     await import_batches(client, IMPORT_BATCHES[:1], 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{ROOT_ID}"), 200, expected_tree)
+    await assert_nodes(client, ROOT_ID, 200, expected_tree)
 
 
 @pytest.mark.asyncio
@@ -41,7 +37,7 @@ async def test_nodes_offer(client):
                     "price": 69999,
                 }
             ],
-            "updateDate": "2022-02-02T12:00:00Z",
+            "updateDate": "2022-02-02T12:00:00.000Z",
         }
     ]
     expected_tree = {
@@ -49,14 +45,14 @@ async def test_nodes_offer(client):
         "name": 'Goldstar 65" LED UHD LOL Very Smart',
         "id": item_id,
         "parentId": None,
-        "date": "2022-02-02T12:00:00Z",
+        "date": "2022-02-02T12:00:00.000Z",
         "price": 69999,
         "children": None,
     }
 
     await import_batches(client, batches, 200)
 
-    assert_nodes_response(await client.get(f"/nodes/{item_id}"), 200, expected_tree)
+    await assert_nodes(client, item_id, 200, expected_tree)
 
 
 @pytest.mark.asyncio

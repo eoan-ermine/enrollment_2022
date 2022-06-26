@@ -8,12 +8,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field, validator
 from pydantic.json import ENCODERS_BY_TYPE
 
+from analyzer.utils.misc import nameddict
+
 if TYPE_CHECKING:
     from analyzer.db import schema
 
 
-# Format of datetimes in unit_tests
-ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%SZ")
+# Поправляем форматирование дат на форматирование, требуемое спецификацией
+ENCODERS_BY_TYPE[datetime] = lambda d: "%04d" % d.year + d.strftime("-%m-%dT%H:%M:%S.000Z")
 
 
 class ShopUnitType(Enum):
@@ -75,6 +77,16 @@ class ShopUnitImport(BaseModel):
     )
     type: ShopUnitType
     price: Optional[int] = Field(None, description="Целое число, для категорий поле должно содержать null.")
+
+    def to_database_row(self, last_update: datetime) -> nameddict:
+        return nameddict(
+            id=str(self.id),
+            name=self.name,
+            parent_id=str(self.parentId) if self.parentId else None,
+            is_category=self.type == ShopUnitType.CATEGORY,
+            price=self.price,
+            last_update=last_update,
+        )
 
     @validator("price")
     def category_price_null(cls, v, values, **kwargs):
@@ -142,6 +154,8 @@ class ShopUnitStatisticRequest(BaseModel):
     @validator("date_end")
     def validate_range(cls, value, values, **kwargs):
         # date_start точно прошло валидацию, т.к. изначально прошло валидацию в обработчике эндпоинта
+        # date_start не должно быть больше или равно date_end, так как интервал определен как [date_start; date_end)
+
         if values["date_start"] >= value:
             raise ValueError(
                 f"{values['date_start']} and {value} must define valid half-opened interval [date_start; date_end)"

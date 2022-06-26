@@ -1,18 +1,50 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, update
+from sqlalchemy import and_, bindparam, delete, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
 
-from analyzer.utils.misc import model_to_dict
+from analyzer.utils.database import BatchInserter
 
-from .hierarchy_manager import UnitHierarchyManager
+from . import queries
+from .queries.hierarchy import (
+    HierarchyUpdate,
+    HierarchyUpdateQuery,
+    HierarchyUpdateType,
+)
+from .queries.unit import DateUpdate, PriceUpdateType, UnitUpdateQuery
 from .schema import CategoryInfo, PriceUpdate, ShopUnit, UnitHierarchy
-from .update_queries import UnitUpdate, UnitUpdateQuery, UnitUpdateType
+
+
+@asynccontextmanager
+async def get_dal(session: Session) -> DAL:
+    client = DAL(session)
+    try:
+        await session.begin()
+        yield client
+    finally:
+        await session.commit()
+
+
+async def apply_updates(
+    session: Session,
+    update_query: UnitUpdateQuery,
+    hierarchy_query: HierarchyUpdateQuery,
+    update_date: Optional[datetime] = None,
+) -> None:
+    async with session.begin():
+        await hierarchy_query.execute(session)
+
+    # Обновление price должно происходить лишь после построения иерархии
+    async with session.begin():
+        if update_query:
+            parents = await DAL(session).get_parents_ids(update_query.get_updating_ids())
+            await update_query.execute(session, parents, update_date)
 
 
 class ForbiddenOperation(RuntimeError):
@@ -22,7 +54,194 @@ class ForbiddenOperation(RuntimeError):
 class DAL:
     def __init__(self, session: Session) -> DAL:
         self.session = session
-        self.updateQuery = UnitUpdateQuery()
+
+    async def delete_unit(self, id: str) -> None:
+        unit_query = UnitUpdateQuery()
+        hierarchy_query = HierarchyUpdateQuery()
+
+        # one() выбрасывает исключение, если результата нет — мы обрабатываем и выбрасываем 404
+        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
+        unit = q.one()
+
+        # Обновляем price у всех категорий — родителей
+        if unit.parent_id:
+            if unit.is_category:
+                total_sum, childs_count = await self._get_category_info(unit.id)
+                unit_query.add(
+                    unit.parent_id,
+                    queries.unit.PriceUpdate(PriceUpdateType.CHANGE, sum_diff=-total_sum, count_diff=-childs_count),
+                )
+            else:
+                unit_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.DELETE, unit))
+
+        # Удаляем всех детей у текущей и всех дочерних категорий, удаляем служебные данные об иерархии
+        if unit.is_category:
+            q = await self.session.scalars(select(UnitHierarchy.id).where(UnitHierarchy.parent_id == id))
+            child_categories = [unit.id] + q.all()
+            await self.session.execute(delete(ShopUnit).where(ShopUnit.parent_id.in_(child_categories)))
+
+            hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.DELETE, unit))
+
+        await self.session.delete(unit)
+        return (unit_query, hierarchy_query)
+
+    async def get_parents_ids(self, category_ids: List[str]) -> Dict[str, List[str]]:
+        result = {category_id: [] for category_id in category_ids}
+
+        q = await self.session.execute(
+            select(UnitHierarchy.parent_id, UnitHierarchy.id).where(UnitHierarchy.id.in_(category_ids))
+        )
+        for parent_id, ident in q.all():
+            result[ident].append(parent_id)
+
+        return result
+
+    async def add_units(self, units: List, update_date: datetime) -> None:
+        update_query = UnitUpdateQuery()
+        hierarchy_query = HierarchyUpdateQuery()
+        batch_inserter = BatchInserter()
+
+        unit_updates = []
+        category_updates = []
+
+        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id.in_([unit.id for unit in units])))
+        database_units = {unit.id: unit for unit in q.all()}
+
+        for unit in units:
+            old_unit = database_units.get(unit.id, None)
+
+            update_query.add(unit.parent_id, DateUpdate())
+            if old_unit is None:
+                # Создаем юнит, если он не существует. Если это категория — строим иерархию.
+                batch_inserter.add(ShopUnit, unit)
+                if unit.is_category:
+                    batch_inserter.add(CategoryInfo, {"id": unit.id, "sum": 0, "count": 0, "last_update": update_date})
+                    if unit.parent_id:
+                        hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
+                else:
+                    # Обновляем price у всех родительских категорий
+                    update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.ADD, unit))
+            else:
+                # Смена типа юнита запрещена, поэтому мы откатываем транзакцию и выдаем исключение
+                if unit.is_category != old_unit.is_category:
+                    await self.session.close()
+                    raise ForbiddenOperation()
+
+                if old_unit.parent_id != unit.parent_id:
+                    # Если обновился родитель, нам необходимо обновить last_update предыдущего родителя
+                    update_query.add(old_unit.parent_id, DateUpdate())
+
+                    # Пересчитываем поле price у родителей, если юнит — категория, то перестраиваем иерархию
+                    if not unit.is_category:
+                        update_query.add(old_unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.DELETE, old_unit))
+                        update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.ADD, unit))
+                    else:
+                        totalSum, childsCount = await self._get_category_info(unit.id)
+                        update_query.add(
+                            old_unit.parent_id,
+                            queries.unit.PriceUpdate(
+                                PriceUpdateType.CHANGE, sum_diff=-totalSum, count_diff=-childsCount
+                            ),
+                        )
+                        update_query.add(
+                            unit.parent_id,
+                            queries.unit.PriceUpdate(PriceUpdateType.CHANGE, sum_diff=totalSum, count_diff=childsCount),
+                        )
+
+                        hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.DELETE, old_unit))
+                        if unit.parent_id:
+                            hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
+                else:
+                    # Если родитель не изменился, нам надо лишь пересчитать поле price у родительских категорий
+                    # (в том случае, если price у unit и old_unit разный, иначе это будут лишь лишние запросы)
+                    if unit.price != old_unit.price:
+                        update_query.add(
+                            unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit)
+                        )
+
+                # Обновляем поля. Два списка для накопления изменений нам необходимы ввиду того, что для товаров
+                # необходимо обновлять price, а для категорий — нет (там всегда лежит None)
+                update_values = dict(id_=unit.id, **self._get_update_values(unit))
+                if unit.is_category:
+                    category_updates.append(update_values)
+                else:
+                    unit_updates.append(update_values)
+
+            # Независимо от того, изменилась ли цена (так гласит спецификация), нам необходимо добавлять PriceUpdate
+            if not unit.is_category:
+                batch_inserter.add(PriceUpdate, {"unit_id": unit.id, "price": unit.price, "date": update_date})
+
+        # Нам не нужны пустые update запросы, поэтому мы делаем проверки
+        await batch_inserter.execute(self.session)
+        update_stmt = update(ShopUnit).where(ShopUnit.id == bindparam("id_"))
+        if unit_updates:
+            await self.session.execute(update_stmt.values(self._get_update_params(is_category=False)), unit_updates)
+        if category_updates:
+            await self.session.execute(update_stmt.values(self._get_update_params(is_category=True)), category_updates)
+
+        return (update_query, hierarchy_query)
+
+    async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
+        # Проверка, что элемент существует. Отсутствие статистики не значит отсутствие элемента
+
+        q = await self.session.execute(select(ShopUnit.id).where(ShopUnit.id == id))
+        q.one()  # Исключение, если элемента не существует
+
+        # Согласно спецификации, обновления должны получаться за полуинтервал [from, to)
+        q = await self.session.execute(
+            self._get_statistics_query(
+                and_(ShopUnit.id == id, PriceUpdate.date >= date_start, PriceUpdate.date < date_end)
+            )
+        )
+        return q.all()
+
+    async def get_node(self, id: str) -> ShopUnit:
+        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
+        unit = q.one()
+        return await self._retrieve_unit(unit)
+
+    async def get_sales(self, date: datetime) -> List[ShopUnit]:
+        # Мы пишем == False вместо is not False ввиду того, что только такое сравнение sqlalchemy может преобразовать
+        # в SQL код
+        # Согласно спецификации, обновления должны получаться за интервал [date - 24h, date]
+
+        q = await self.session.execute(
+            self._get_statistics_query(
+                and_(
+                    ShopUnit.is_category == False,
+                    PriceUpdate.date >= (date - timedelta(days=1)),
+                    PriceUpdate.date <= date,
+                )
+            )
+        )
+        return q.all()
+
+    def _get_update_values(self, unit) -> Dict:
+        if unit.is_category:
+            return {"name": unit.name, "parent_id": unit.parent_id, "last_update": unit.last_update}
+        else:
+            return {
+                "name": unit.name,
+                "parent_id": unit.parent_id,
+                "price": unit.price,
+                "last_update": unit.last_update,
+            }
+
+    def _get_update_params(self, is_category) -> Dict:
+        if is_category:
+            # Для категорий price не должен обновляться, так как он всегда None
+            return {
+                "name": bindparam("name"),
+                "parent_id": bindparam("parent_id"),
+                "last_update": bindparam("last_update"),
+            }
+        else:
+            return {
+                "name": bindparam("name"),
+                "parent_id": bindparam("parent_id"),
+                "price": bindparam("price"),
+                "last_update": bindparam("last_update"),
+            }
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
@@ -32,6 +251,8 @@ class DAL:
         return (totalSum, childsCount)
 
     async def _retrieve_unit(self, unit: ShopUnit) -> ShopUnit:
+        # Рекурсивно получаем всех детей
+
         unit.children = None
         if unit.is_category:
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.parent_id == unit.id))
@@ -52,126 +273,3 @@ class DAL:
             .where(*whereclause)
             .join(PriceUpdate, ShopUnit.id == PriceUpdate.unit_id)
         )
-
-    async def delete_unit(self, id: str) -> None:
-        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
-        unit = q.one()
-
-        if unit.parent_id:
-            query = UnitUpdateQuery()
-            if unit.is_category:
-                total_sum, childs_count = await self._get_category_info(unit.id)
-                query.add_price_update(
-                    unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sum_diff=-total_sum, count_diff=-childs_count)
-                )
-                await UnitHierarchyManager(self.session).delete(unit)
-            else:
-                query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, unit))
-            await query.flush(self.session, await self.get_parents_ids([unit.parent_id]))
-
-        await self.session.delete(unit)
-
-    async def get_parents_ids(self, category_ids: List[str]) -> Dict[str, List[str]]:
-        result = {category_id: [] for category_id in category_ids}
-
-        q = await self.session.execute(
-            select(UnitHierarchy.parent_id, UnitHierarchy.id).where(UnitHierarchy.id.in_(category_ids))
-        )
-        for parent_id, ident in q.all():
-            result[ident].append(parent_id)
-
-        return result
-
-    def get_update_values(self, unit: ShopUnit) -> Dict:
-        dict_repr = model_to_dict(unit)
-        del dict_repr["id"]
-
-        if unit.is_category:
-            del dict_repr["price"]
-        return dict_repr
-
-    async def add_units(self, units: List[ShopUnit], update_date: datetime) -> None:
-        update_query = UnitUpdateQuery()
-
-        for unit in units:
-            q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
-            old_unit = q.one_or_none()
-
-            update_query.add_date_update(unit.parent_id)
-            if old_unit is None:
-                self.session.add(unit)
-                if unit.is_category:
-                    self.session.add(CategoryInfo(id=unit.id, sum=0, count=0))
-                    if unit.parent_id:
-                        await UnitHierarchyManager(self.session).build(unit)
-                else:
-                    update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.ADD, unit))
-            else:
-                if unit.is_category != old_unit.is_category:
-                    await self.session.close()
-                    raise ForbiddenOperation()
-
-                if old_unit.parent_id != unit.parent_id:
-                    update_query.add_date_update(old_unit.parent_id)
-                    if not unit.is_category:
-                        update_query.add_price_update(old_unit.parent_id, UnitUpdate(UnitUpdateType.DELETE, old_unit))
-                        update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.ADD, unit))
-                    else:
-                        totalSum, childsCount = await self._get_category_info(unit.id)
-                        update_query.add_price_update(
-                            old_unit.parent_id,
-                            UnitUpdate(UnitUpdateType.CHANGE, sum_diff=-totalSum, count_diff=-childsCount),
-                        )
-                        update_query.add_price_update(
-                            unit.parent_id, UnitUpdate(UnitUpdateType.CHANGE, sum_diff=totalSum, count_diff=childsCount)
-                        )
-
-                        await UnitHierarchyManager(self.session).delete(old_unit)
-                        if unit.parent_id:
-                            await UnitHierarchyManager(self.session).build(unit)
-                else:
-                    update_query.add_price_update(unit.parent_id, UnitUpdate(UnitUpdateType.REPLACE, unit, old_unit))
-
-                await self.session.execute(
-                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self.get_update_values(unit))
-                )
-
-            if not unit.is_category:
-                self.session.add(PriceUpdate(unit_id=unit.id, price=unit.price, date=update_date))
-
-        return update_query
-
-    async def apply_updates(self, update_query: UnitUpdateQuery, update_date: datetime) -> None:
-        if update_query:
-            parents = await self.get_parents_ids(update_query.get_updating_ids())
-            await update_query.flush(self.session, parents, update_date)
-
-    async def get_node_statistic(self, id: str, date_start: datetime, date_end: datetime) -> List[ShopUnit]:
-        # Проверка, что элемент существует. Отсутствие статистики не значит отсутствие элемента
-
-        q = await self.session.execute(select(ShopUnit.id).where(ShopUnit.id == id))
-        q.one()  # Исключение, если элемента не существует
-
-        q = await self.session.execute(
-            self._get_statistics_query(
-                and_(ShopUnit.id == id, PriceUpdate.date >= date_start, PriceUpdate.date < date_end)
-            )
-        )
-        return q.all()
-
-    async def get_node(self, id: str) -> ShopUnit:
-        q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == id))
-        unit = q.one()
-        return await self._retrieve_unit(unit)
-
-    async def get_sales(self, date: datetime) -> List[ShopUnit]:
-        q = await self.session.execute(
-            self._get_statistics_query(
-                and_(
-                    ShopUnit.is_category == False,
-                    PriceUpdate.date >= date - timedelta(days=1),
-                    PriceUpdate.date <= date,
-                )
-            )
-        )
-        return q.all()
