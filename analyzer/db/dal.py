@@ -161,7 +161,7 @@ class DAL:
 
                 # Обновляем поля. Два списка для накопления изменений нам необходимы ввиду того, что для товаров
                 # необходимо обновлять price, а для категорий — нет (там всегда лежит None)
-                update_values = dict(id_=unit.id, **self._get_update_values(unit, update_date))
+                update_values = dict(id_=unit.id, **self._get_update_values(unit))
                 if unit.is_category:
                     category_updates.append(update_values)
                 else:
@@ -216,11 +216,16 @@ class DAL:
         )
         return q.all()
 
-    def _get_update_values(self, unit, last_update) -> Dict:
+    def _get_update_values(self, unit) -> Dict:
         if unit.is_category:
-            return {"name": unit.name, "parent_id": unit.parent_id, "last_update": last_update}
+            return {"name": unit.name, "parent_id": unit.parent_id, "last_update": unit.last_update}
         else:
-            return {"name": unit.name, "parent_id": unit.parent_id, "price": unit.price, "last_update": last_update}
+            return {
+                "name": unit.name,
+                "parent_id": unit.parent_id,
+                "price": unit.price,
+                "last_update": unit.last_update,
+            }
 
     def _get_update_params(self, is_category) -> Dict:
         if is_category:

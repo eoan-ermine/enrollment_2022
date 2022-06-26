@@ -8,6 +8,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field, validator
 from pydantic.json import ENCODERS_BY_TYPE
 
+from analyzer.utils.misc import nameddict
+
 if TYPE_CHECKING:
     from analyzer.db import schema
 
@@ -76,15 +78,15 @@ class ShopUnitImport(BaseModel):
     type: ShopUnitType
     price: Optional[int] = Field(None, description="Целое число, для категорий поле должно содержать null.")
 
-    def to_database_row(self, last_update: datetime):
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "parent_id": str(self.parentId) if self.parentId else None,
-            "is_category": self.type == ShopUnitType.CATEGORY,
-            "price": self.price,
-            "last_update": last_update,
-        }
+    def to_database_row(self, last_update: datetime) -> nameddict:
+        return nameddict(
+            id=str(self.id),
+            name=self.name,
+            parent_id=str(self.parentId) if self.parentId else None,
+            is_category=self.type == ShopUnitType.CATEGORY,
+            price=self.price,
+            last_update=last_update,
+        )
 
     @validator("price")
     def category_price_null(cls, v, values, **kwargs):
