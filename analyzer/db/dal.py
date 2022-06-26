@@ -153,6 +153,9 @@ class DAL:
         return await self._retrieve_unit(unit)
 
     async def get_sales(self, date: datetime) -> List[ShopUnit]:
+        # Мы пишем == False вместо is not False ввиду того, что только такое сравнение sqlalchemy может преобразовать
+        # в SQL код
+
         q = await self.session.execute(
             self._get_statistics_query(
                 and_(

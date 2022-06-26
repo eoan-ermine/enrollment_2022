@@ -5,7 +5,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from analyzer.api.app import app, get_session
+from analyzer.api.app import app
+from analyzer.utils.database import get_session
 
 
 @pytest.fixture
