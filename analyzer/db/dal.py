@@ -42,8 +42,9 @@ async def apply_updates(
 
     # Обновление price должно происходить лишь после построения иерархии
     async with session.begin():
-        parents = await DAL(session).get_parents_ids(update_query.get_updating_ids())
-        await update_query.execute(session, parents, update_date)
+        if update_query:
+            parents = await DAL(session).get_parents_ids(update_query.get_updating_ids())
+            await update_query.execute(session, parents, update_date)
 
 
 class ForbiddenOperation(RuntimeError):
