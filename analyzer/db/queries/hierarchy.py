@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 
-from sqlalchemy import delete
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import delete, insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
@@ -29,7 +28,9 @@ class HierarchyUpdate:
 
     async def _build(self, session: Session) -> None:
         ident, parent_id = self.unit_id, self.parent_id
-        await session.execute(insert(UnitHierarchy).values(parent_id=parent_id, id=ident))
+
+        hierarchy_updates = []
+        hierarchy_updates.append({"parent_id": parent_id, "id": ident})
 
         while True:
             q = await session.scalars(select(ShopUnit.parent_id).where(ShopUnit.id == parent_id))
@@ -38,7 +39,9 @@ class HierarchyUpdate:
             if parent_id is None:
                 break
 
-            await session.execute(insert(UnitHierarchy).values(parent_id=parent_id, id=ident))
+            hierarchy_updates.append({"parent_id": parent_id, "id": ident})
+
+        await session.execute(insert(UnitHierarchy).values(hierarchy_updates))
 
     async def _delete(self, session: Session) -> None:
         await session.execute(delete(UnitHierarchy).where(UnitHierarchy.id == self.unit_id))

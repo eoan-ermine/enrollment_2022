@@ -104,6 +104,8 @@ class UnitUpdateQuery:
         total_sum_diff = {}
         total_count_diff = {}
 
+        price_updates = []
+
         if update_date is None:
             q = await session.execute(select(ShopUnit.id, ShopUnit.last_update).where(ShopUnit.id.in_(all_parents_ids)))
             update_dates = {identifier: last_update for identifier, last_update in q.all()}
@@ -132,11 +134,15 @@ class UnitUpdateQuery:
             avg = info.sum / info.count if info.count else None
 
             await session.execute(update(ShopUnit).where(ShopUnit.id == parent_id).values(price=avg))
-            await session.execute(
-                insert(schema.PriceUpdate).values(
-                    unit_id=parent_id, price=avg, date=update_date if update_date is not None else update_dates[parent]
-                )
+            price_updates.append(
+                {
+                    "unit_id": parent_id,
+                    "price": avg,
+                    "date": update_date if update_date is not None else update_dates[parent],
+                }
             )
+
+        await session.execute(insert(schema.PriceUpdate).values(price_updates))
 
     def __bool__(self) -> bool:
         return bool(self.date_updates) or bool(self.price_updates)

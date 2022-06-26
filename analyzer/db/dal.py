@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, delete, update
+from sqlalchemy import and_, delete, insert, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
@@ -83,15 +83,20 @@ class DAL:
         update_query = UnitUpdateQuery()
         hierarchy_query = HierarchyUpdateQuery()
 
+        new_units = []
+        new_category_infos = []
+        new_price_updates = []
+
         for unit in units:
+            dict_representation = model_to_dict(unit)
             q = await self.session.scalars(select(ShopUnit).where(ShopUnit.id == unit.id))
             old_unit = q.one_or_none()
 
             update_query.add(unit.parent_id, DateUpdate())
             if old_unit is None:
-                self.session.add(unit)
+                new_units.append(dict_representation)
                 if unit.is_category:
-                    self.session.add(CategoryInfo(id=unit.id, sum=0, count=0))
+                    new_category_infos.append({"id": unit.id, "sum": 0, "count": 0})
                     if unit.parent_id:
                         hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
                 else:
@@ -126,11 +131,21 @@ class DAL:
                     update_query.add(unit.parent_id, queries.unit.PriceUpdate(PriceUpdateType.REPLACE, unit, old_unit))
 
                 await self.session.execute(
-                    update(ShopUnit).where(ShopUnit.id == unit.id).values(**self._get_update_values(unit))
+                    update(ShopUnit)
+                    .where(ShopUnit.id == unit.id)
+                    .values(**self._get_update_values(dict_representation))
                 )
 
             if not unit.is_category:
-                self.session.add(PriceUpdate(unit_id=unit.id, price=unit.price, date=update_date))
+                new_price_updates.append({"unit_id": unit.id, "price": unit.price, "date": update_date})
+
+        # Нам не нужны пустые insert/update запросы
+        if new_units:
+            await self.session.execute(insert(ShopUnit).values(new_units))
+        if new_category_infos:
+            await self.session.execute(insert(CategoryInfo).values(new_category_infos))
+        if new_price_updates:
+            await self.session.execute(insert(PriceUpdate).values(new_price_updates))
 
         return (update_query, hierarchy_query)
 
@@ -167,13 +182,11 @@ class DAL:
         )
         return q.all()
 
-    def _get_update_values(self, unit: ShopUnit) -> Dict:
-        dict_repr = model_to_dict(unit)
-        del dict_repr["id"]
-
-        if unit.is_category:
-            del dict_repr["price"]
-        return dict_repr
+    def _get_update_values(self, unit_row: Dict) -> Dict:
+        update_values = dict(unit_row)
+        if unit_row["is_category"]:
+            del update_values["price"]
+        return update_values
 
     async def _get_category_info(self, category_id: str) -> Tuple[int, int]:
         q = await self.session.execute(
