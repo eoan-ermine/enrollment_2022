@@ -5,12 +5,12 @@ from enum import Enum, auto
 from typing import Dict, List, Optional, Set, Union
 
 from sqlalchemy import bindparam, update
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
 from analyzer.db import schema
 from analyzer.db.schema import CategoryInfo, ShopUnit
+from analyzer.utils.database import BatchInserter
 from analyzer.utils.misc import flatten
 
 
@@ -104,7 +104,7 @@ class UnitUpdateQuery:
         total_sum_diff = {}
         total_count_diff = {}
 
-        price_updates = []
+        batch_inserter = BatchInserter()
         avg_updates = []
 
         if update_date is None:
@@ -135,15 +135,16 @@ class UnitUpdateQuery:
             avg = info.sum / info.count if info.count else None
 
             avg_updates.append({"id_": parent_id, "price": avg})
-            price_updates.append(
+            batch_inserter.add(
+                schema.PriceUpdate,
                 {
                     "unit_id": parent_id,
                     "price": avg,
                     "date": update_date if update_date is not None else update_dates[parent],
-                }
+                },
             )
 
-        await session.execute(insert(schema.PriceUpdate).values(price_updates))
+        await batch_inserter.execute(session)
         await session.execute(
             update(ShopUnit).where(ShopUnit.id == bindparam("id_")).values({"price": bindparam("price")}), avg_updates
         )

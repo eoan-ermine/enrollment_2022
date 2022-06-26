@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, bindparam, delete, insert, update
+from sqlalchemy import and_, bindparam, delete, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Join
+
+from analyzer.utils.database import BatchInserter
 
 from . import queries
 from .queries.hierarchy import (
@@ -16,6 +19,16 @@ from .queries.hierarchy import (
 )
 from .queries.unit import DateUpdate, PriceUpdateType, UnitUpdateQuery
 from .schema import CategoryInfo, PriceUpdate, ShopUnit, UnitHierarchy
+
+
+@asynccontextmanager
+async def get_dal(session: Session) -> DAL:
+    client = DAL(session)
+    try:
+        await session.begin()
+        yield client
+    finally:
+        await session.commit()
 
 
 async def apply_updates(
@@ -80,10 +93,7 @@ class DAL:
     async def add_units(self, units: List, update_date: datetime) -> None:
         update_query = UnitUpdateQuery()
         hierarchy_query = HierarchyUpdateQuery()
-
-        new_units = []
-        new_category_infos = []
-        new_price_updates = []
+        batch_inserter = BatchInserter()
 
         unit_updates = []
         category_updates = []
@@ -94,9 +104,9 @@ class DAL:
 
             update_query.add(unit.parent_id, DateUpdate())
             if old_unit is None:
-                new_units.append(unit)
+                batch_inserter.add(ShopUnit, unit)
                 if unit.is_category:
-                    new_category_infos.append({"id": unit.id, "sum": 0, "count": 0})
+                    batch_inserter.add(CategoryInfo, {"id": unit.id, "sum": 0, "count": 0})
                     if unit.parent_id:
                         hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
                 else:
@@ -137,16 +147,10 @@ class DAL:
                     unit_updates.append(update_values)
 
             if not unit.is_category:
-                new_price_updates.append({"unit_id": unit.id, "price": unit.price, "date": update_date})
+                batch_inserter.add(PriceUpdate, {"unit_id": unit.id, "price": unit.price, "date": update_date})
 
-        # Нам не нужны пустые insert/update запросы
-        if new_units:
-            await self.session.execute(insert(ShopUnit).values(new_units))
-        if new_category_infos:
-            await self.session.execute(insert(CategoryInfo).values(new_category_infos))
-        if new_price_updates:
-            await self.session.execute(insert(PriceUpdate).values(new_price_updates))
-
+        # Нам не нужны пустые update запросы, поэтому мы делаем проверки
+        await batch_inserter.execute(self.session)
         update_stmt = update(ShopUnit).where(ShopUnit.id == bindparam("id_"))
         if unit_updates:
             await self.session.execute(update_stmt.values(self._get_update_params(is_category=False)), unit_updates)

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from enum import Enum, auto
 
-from sqlalchemy import delete, insert
+from sqlalchemy import delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
 from analyzer.db.schema import ShopUnit, UnitHierarchy
+from analyzer.utils.database import BatchInserter
 
 
 class HierarchyUpdateType(Enum):
@@ -28,10 +29,9 @@ class HierarchyUpdate:
 
     async def _build(self, session: Session) -> None:
         ident, parent_id = self.unit_id, self.parent_id
+        batch_inserter = BatchInserter()
 
-        hierarchy_updates = []
-        hierarchy_updates.append({"parent_id": parent_id, "id": ident})
-
+        batch_inserter.add(UnitHierarchy, {"parent_id": parent_id, "id": ident})
         while True:
             q = await session.scalars(select(ShopUnit.parent_id).where(ShopUnit.id == parent_id))
             parent_id = q.one_or_none()
@@ -39,9 +39,9 @@ class HierarchyUpdate:
             if parent_id is None:
                 break
 
-            hierarchy_updates.append({"parent_id": parent_id, "id": ident})
+            batch_inserter.add(UnitHierarchy, {"parent_id": parent_id, "id": ident})
 
-        await session.execute(insert(UnitHierarchy).values(hierarchy_updates))
+        await batch_inserter.execute(session)
 
     async def _delete(self, session: Session) -> None:
         await session.execute(delete(UnitHierarchy).where(UnitHierarchy.id == self.unit_id))

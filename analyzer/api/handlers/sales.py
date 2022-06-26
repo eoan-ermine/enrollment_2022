@@ -7,7 +7,8 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from analyzer.api.schema import Error, ShopUnitStatisticResponse, ShopUnitStatisticUnit
-from analyzer.utils.database import get_dal, get_session
+from analyzer.db.dal import get_dal
+from analyzer.utils.database import get_session
 
 from . import router
 
