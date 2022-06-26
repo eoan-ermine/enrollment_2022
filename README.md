@@ -51,7 +51,7 @@ ansible-playbook -i hosts.ini --user=root deploy.yml
 -   `make test` — запустить тесты
 -   `make sdist` — создать [source distribution](https://packaging.python.org/glossary/)
 -   `make docker` — собрать Docker-образ
--   `make upload` — загрузить docker-образ на ghcr.io (требуется авторизация)
+-   `make upload` — загрузить docker-образ на <ghcr.io> (требуется авторизация)
 
 ## Как подготовить окружение для разработки?
 
