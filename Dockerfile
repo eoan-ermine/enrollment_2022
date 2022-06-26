@@ -30,4 +30,4 @@ COPY --from=builder /analyzer/dist .
 ENV PATH="/venv/bin:${PATH}"
 
 RUN . /venv/bin/activate && pip install *.whl
-CMD ["analyzer-api"]
+CMD ["analyzer-api", "--host", "0.0.0.0"]
