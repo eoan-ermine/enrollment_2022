@@ -113,7 +113,7 @@ class DAL:
                 # Создаем юнит, если он не существует. Если это категория — строим иерархию.
                 batch_inserter.add(ShopUnit, unit)
                 if unit.is_category:
-                    batch_inserter.add(CategoryInfo, {"id": unit.id, "sum": 0, "count": 0})
+                    batch_inserter.add(CategoryInfo, {"id": unit.id, "sum": 0, "count": 0, "last_update": update_date})
                     if unit.parent_id:
                         hierarchy_query.add(HierarchyUpdate(HierarchyUpdateType.BUILD, unit))
                 else:

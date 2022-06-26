@@ -60,3 +60,7 @@ class CategoryInfo(Base):
 
     sum = Column(Integer, nullable=False)
     count = Column(Integer, nullable=False)
+
+    # Дубликация поля date у ShopUnit. Больше информации, почему это надо — issue#37
+    # Brief: позволяет оптимизировать один select запрос при удалении юнита
+    last_update = Column(type_=TIMESTAMP(timezone=True))
